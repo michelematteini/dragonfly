@@ -1,0 +1,92 @@
+﻿shader: TemplShadowMap;
+using Core;
+using Layouts;
+using MatrixHelper;
+using Depth;
+using SolidCommon;
+
+template POS3_TEX_NORM GetVertexData(vertex_t IN);
+
+template void PostWorldSpaceProcessing(inout SolidVertexIntermediates data);
+
+struct ShadowBiasConfig
+{
+	float precisionBias;
+	float normalBias;
+	float quantizationBias;
+};
+
+template ShadowBiasConfig GetShadowBias();
+
+void ProcessShadowMapVertexData(inout SolidVertexIntermediates data)
+{
+	bool isPerspective = IsPerspective(CAMERA_MATRIX);
+	float worldTexelSize = CalcWorldSpaceTexelSize(data.worldPos.xyz / data.worldPos.w, data.screenPos).y; // use only one component for performance
+
+	ShadowBiasConfig shadowBias = GetShadowBias();
+	float3 clipPos = data.screenPos.xyz / data.screenPos.w;
+	
+	// if the vertex is visible...
+	if(all(float3(abs(clipPos.xy), 1.0 - clipPos.z) < 1.0))
+	{
+		// apply screen-space normal bias
+		if (shadowBias.normalBias != 0)
+		{
+			// transform the normal-biased position
+			float4 biasedPos = data.worldPos;
+			biasedPos.xyz += (data.worldNormal * worldTexelSize * shadowBias.normalBias);
+			biasedPos = mul(biasedPos, CAMERA_MATRIX);
+
+			// output the xy offset
+			data.screenPos.xy = biasedPos.xy * abs(data.screenPos.w / biasedPos.w);
+		}
+	}
+}
+
+VS POS4_TEX_NORM_SCREEN4 ShadowMap(vertex_t IN)
+{
+	POS3_TEX_NORM vertex = GetVertexData(IN);
+
+	// calc intermediate vertex data
+	SolidVertexIntermediates data;
+	data.worldPos = float4(vertex.position, 1.0);
+	data.worldPos = mul(data.worldPos, INSTANCE_MATRIX);
+	data.worldPos = mul(data.worldPos, WORLD_MATRIX);
+	data.texCoords = vertex.texCoords;
+	data.worldNormal = mul(vertex.normal, (float3x3)INSTANCE_MATRIX);
+	data.worldNormal = mul(data.worldNormal, NRM_WORLD_MATRIX);
+	data.screenPos = data.worldPos;
+	PostWorldSpaceProcessing(inout data);
+	data.screenPos = mul(data.worldPos, CAMERA_MATRIX);
+
+	ProcessShadowMapVertexData(inout data);
+
+	// prepare interpolable output
+	POS4_TEX_NORM_SCREEN4 OUT;
+	OUT.position = data.screenPos;
+	OUT.texCoords = data.texCoords;
+	OUT.screenPos = data.screenPos;
+	OUT.normal = data.worldNormal;
+	return OUT;
+}
+
+template float GetPixelDepth(float4 screenPos, float2 texCoords);
+
+PS RT_HALF ShadowMap(POS4_TEX_NORM_SCREEN4 IN)
+{
+	float depth = GetPixelDepth(IN.screenPos, IN.texCoords);
+	ShadowBiasConfig shadowBias = GetShadowBias();
+
+	// add a 16bit half precision depth bias
+	if (shadowBias.precisionBias != 0)
+	{
+		depth += CalcZBiasOf(depth, 10, shadowBias.precisionBias);
+	}
+
+	RT_HALF OUT;
+	OUT.color = float4(depth, 0, 0, 0);
+	return OUT;
+}
+
+// Template for a 16bit depth pass
+instanced template effect ShadowMap{ VS = ShadowMap, PS = ShadowMap };

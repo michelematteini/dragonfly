@@ -1,0 +1,36 @@
+﻿shader: SphericalBg;
+using Core;
+using Layouts;
+using RayTracing;
+using EnvMaps;
+
+texture backgroundTex : NoFilter;
+float backgroundLod;
+
+VS POS4_TEX_NORM RayTraceSphere(POS3_TEX_NORM IN)
+{
+	POS4_TEX_NORM OUT;
+	OUT.position = float4(IN.position.x, IN.position.y, 0.0f, 1.0f);
+	OUT.normal = RayDirFromClipCoords(IN.position.xy);
+	OUT.texCoords = (float2)0;
+	return OUT;
+}
+
+PS RT_COLOR Cube2DBg(POS4_TEX_NORM IN)
+{
+	RT_COLOR OUT;
+	OUT.color.a = 1.0;
+
+	// calc view direction
+	float3 viewDir = normalize(IN.normal);
+
+	// sample the background texture with bilinear interpolation
+	OUT.color.rgb = sampleHDRCube2DLevel(backgroundTex, texelSize(backgroundTex), viewDir, backgroundLod);
+
+	// hdr encoding
+	OUT.color = EncodeRGBE(OUT.color.rgb);
+
+	return OUT;
+}
+
+effect Cube2DBg {VS = RayTraceSphere, PS = Cube2DBg};

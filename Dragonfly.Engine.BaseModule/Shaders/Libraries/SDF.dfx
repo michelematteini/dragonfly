@@ -1,0 +1,32 @@
+﻿shader: SDF;
+
+using Math;
+using AlphaBlend;
+
+float2 SDF_Empty()
+{
+    return (float2)9999999999.0;
+}
+
+float2 SDF_LineSegment2D(float2 lineStart, float2 lineEnd, float2 x)
+{
+    float2 lineVec = lineEnd - lineStart;
+    float2 xVec = x - lineStart;
+
+    float t = dot(lineVec, xVec) / dot(lineVec, lineVec);
+    float2 dvec = xVec - lineVec * saturate(t);
+    float d = sqrt(dot(dvec, dvec)) * GetWinding(lineVec, xVec);
+
+    return float2(t, d);
+}
+
+void TraceSDF(float2 sdf, float4 color, float thickness, inout float4 background)
+{
+    background = lerp(background, color, step(abs(sdf.y), thickness));
+}
+
+void TraceSDFWithAA(float2 sdf, float4 color, float thickness, float pixelThickness, inout float4 background)
+{
+    float coverage = 1.0 - smoothstep(thickness - 0.5 * pixelThickness, thickness + 0.5 * pixelThickness, abs(sdf.y));
+    background = CompositeAlphaBlend(background, color, coverage);
+}

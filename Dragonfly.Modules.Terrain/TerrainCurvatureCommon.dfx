@@ -1,0 +1,73 @@
+﻿shader: TerrainCurvatureCommon;
+using Sampling;
+using TiledFloat3;
+using MatrixHelper;
+
+// curvature params
+variant curvatureEnabled;
+texture curvatureLUT : NoFilter, NoMipMaps, Clamp, AlwaysVisible;
+float4 curvatureUVScaleOffset;
+float2 curvatureTopLeftTexel;
+bool curvatureUVAreTexelRelative;
+float3 curvatureXDir;
+float3 curvatureYDir;
+float3 curvatureNormal;
+
+struct TerrainCurvatureInfo
+{
+	TiledFloat3 offset;
+	float3 normal;
+};
+
+void GatherCurvatureLUT(float2 tileUV, out float4x4 tileSamples, out float4x4 offsetSamples, out float2 sampleWeights)
+{
+	if(curvatureUVAreTexelRelative)
+	{
+		// gather samples from both the LUT sides
+		tileSamples = Gather(curvatureLUT, curvatureTopLeftTexel, texelSize(curvatureLUT));
+		offsetSamples = Gather(curvatureLUT, curvatureTopLeftTexel + float2(0.5, 0.0), texelSize(curvatureLUT));
+		
+		// calc weights
+		sampleWeights = tileUV * curvatureUVScaleOffset.xy + curvatureUVScaleOffset.zw;
+	}
+	else
+	{
+		// calc bilinear coords and weights
+		float2 curvTileTopLeftUV;
+		CalcScaledBilinearCoords(tileUV, curvatureUVScaleOffset.xy, curvatureUVScaleOffset.zw, texelSize(curvatureLUT), curvTileTopLeftUV, sampleWeights);
+
+		// gather samples from both the LUT sides
+		tileSamples = Gather(curvatureLUT, curvTileTopLeftUV, texelSize(curvatureLUT));
+		offsetSamples = Gather(curvatureLUT, curvTileTopLeftUV + float2(0.5, 0.0), texelSize(curvatureLUT));
+	}
+}
+
+TerrainCurvatureInfo SampleCurvatureLUT(float2 tileUV)
+{
+	TerrainCurvatureInfo result = (TerrainCurvatureInfo)0;
+	
+	// sample the curvature LUT
+	float2 sampleWeights;
+	float4x4 tileSamples, offsetSamples;
+	GatherCurvatureLUT(tileUV, out tileSamples, out offsetSamples, out sampleWeights);
+	
+	// calc the local offset
+	
+	result.offset.tile = (int3)tileSamples[0].xyz;
+	
+	// reference all the other samples to the same tile as the first
+	offsetSamples[1].xyz = TF3_ToFloat3(TF3_Make(offsetSamples[1].xyz, (int3)tileSamples[1].xyz), result.offset.tile);
+	offsetSamples[2].xyz = TF3_ToFloat3(TF3_Make(offsetSamples[2].xyz, (int3)tileSamples[2].xyz), result.offset.tile);
+	offsetSamples[3].xyz = TF3_ToFloat3(TF3_Make(offsetSamples[3].xyz, (int3)tileSamples[3].xyz), result.offset.tile);
+	
+	// bilinear interpolate the values
+	result.offset.value = Bilinear(offsetSamples, sampleWeights).xyz;
+	
+	// calc the local normal 
+	result.normal = curvatureNormal;
+	result.normal += curvatureXDir * Bilinear(GetColumn(tileSamples, 3), sampleWeights);
+	result.normal += curvatureYDir * Bilinear(GetColumn(offsetSamples, 3), sampleWeights);
+	result.normal = normalize(result.normal);
+	
+	return result;
+}

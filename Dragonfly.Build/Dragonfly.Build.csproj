@@ -1,0 +1,662 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
+    <ProjectGuid>{EE6019C5-5EE1-4BC7-8F80-7E1134576FAB}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Dragonfly</RootNamespace>
+    <AssemblyName>Dragonfly</AssemblyName>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+    <Reference Include="CjClutter.ObjLoader.Loader">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\$(Platform)\$(Configuration)\CjClutter.ObjLoader.Loader.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="DSLManager">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\$(Platform)\$(Configuration)\DSLManager.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <!--SRC_LINK_START-->
+    <Compile Include="..\Dragonfly.Engine.Core\Component.cs">
+      <Link>Component.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\ComponentManager.cs">
+      <Link>ComponentManager.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\Components\MaterialComponent.cs">
+      <Link>MaterialComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\Components\RenderBufferComponent.cs">
+      <Link>RenderBufferComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\Components\ValueComponent.cs">
+      <Link>ValueComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\Components\RenderPassComponent.cs">
+      <Link>RenderPassComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\ComponentType\ICompCamera.cs">
+      <Link>ICompCamera.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\Components\DrawableComponent.cs">
+      <Link>DrawableComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\ComponentType\ICompAllocator.cs">
+      <Link>ICompAllocator.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\ComponentType\ICompPassConfigurator.cs">
+      <Link>ICompPassConfigurator.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\ComponentType\ICompPausable.cs">
+      <Link>ICompPausable.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\ComponentType\ICompResizable.cs">
+      <Link>ICompResizable.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\ComponentType\ICompTransform.cs">
+      <Link>ICompTransform.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\ComponentType\ICompUpdatable.cs">
+      <Link>ICompUpdatable.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\EngineContext.cs">
+      <Link>EngineContext.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\EngineFactory.cs">
+      <Link>EngineFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\EngineGraphics.cs">
+      <Link>EngineGraphics.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\IEngineModule.cs">
+      <Link>IEngineModule.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\IO\InputDevice.cs">
+      <Link>InputDevice.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\IO\InputGroup.cs">
+      <Link>InputGroup.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\EngineTarget.cs">
+      <Link>EngineTarget.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\Scene.cs">
+      <Link>Scene.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\EngineModule.cs">
+      <Link>EngineModule.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\IComponent.cs">
+      <Link>IComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.Core\Timeline.cs">
+      <Link>Timeline.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\AtlasPacker.cs">
+      <Link>AtlasPacker.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\BaseModule.cs">
+      <Link>BaseModule.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Audio\AFXFadeInComponent.cs">
+      <Link>AFXFadeInComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Audio\AFXHeightGradientComponent.cs">
+      <Link>AFXHeightGradientComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Audio\AFXRandomVolumeComponent.cs">
+      <Link>AFXRandomVolumeComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Audio\AudioComponent.cs">
+      <Link>AudioComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Audio\AudioEngineComponent.cs">
+      <Link>AudioEngineComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Cameras\CSMCameraComponent.cs">
+      <Link>CSMCameraComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Cameras\EditorCameraMovementComponent.cs">
+      <Link>EditorCameraMovementComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Cameras\EditorCameraMouseLookComponent.cs">
+      <Link>EditorCameraMouseLookComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Cameras\EditorCameraComponent.cs">
+      <Link>EditorCameraComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Cameras\IdentityCameraComponent.cs">
+      <Link>IdentityCameraComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Cameras\OrthographicCameraComponentcs.cs">
+      <Link>OrthographicCameraComponentcs.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Cameras\RiggedCamera.cs">
+      <Link>RiggedCamera.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\FunctionComponent.cs">
+      <Link>FunctionComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\GUI\DebugInfoComponent.cs">
+      <Link>DebugInfoComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\GUI\ImageComponent.cs">
+      <Link>ImageComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\GUI\LabelComponent.cs">
+      <Link>LabelComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\GUI\TextRendererComponent.cs">
+      <Link>TextRendererComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\GUI\TextSpriteIndex.cs">
+      <Link>TextSpriteIndex.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\KeyActionComponent.cs">
+      <Link>KeyActionComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Lights\LightListComponent.cs">
+      <Link>LightListComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\GUI\LoadingScreenComponent.cs">
+      <Link>LoadingScreenComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\LoadingCompletedComponent.cs">
+      <Link>LoadingCompletedComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Materials\ImgProcessingMaterial.cs">
+      <Link>ImgProcessingMaterial.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Mesh\DepthMeshConfigComponent.cs">
+      <Link>DepthMeshConfigComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Mesh\MeshAsyncGeometryComponent.cs">
+      <Link>MeshAsyncGeometryComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Shadows\ShadowAtlasParams.cs">
+      <Link>ShadowAtlasParams.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Shadows\ShadowState.cs">
+      <Link>ShadowState.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Lights\AmbientLightComponent.cs">
+      <Link>AmbientLightComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Lights\DirectionalLightComponent.cs">
+      <Link>DirectionalLightComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Lights\Light.cs">
+      <Link>Light.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Lights\PointLightComponent.cs">
+      <Link>PointLightComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Lights\SpotLightComponent.cs">
+      <Link>SpotLightComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Materials\BasicMaterial.cs">
+      <Link>BasicMaterial.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Materials\PhongMaterial.cs">
+      <Link>PhongMaterial.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Materials\TextMaterial.cs">
+      <Link>TextMaterial.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Materials\DepthPassMaterial.cs">
+      <Link>DepthPassMaterial.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Mesh\MeshGeometryComponent.cs">
+      <Link>MeshGeometryComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Mesh\OccluderMeshConfigComponent.cs">
+      <Link>OccluderMeshConfigComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Mesh\PickableMeshConfigComponent.cs">
+      <Link>PickableMeshConfigComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\PathWalkerComponent.cs">
+      <Link>PathWalkerComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Shadows\ShadowAtlasComponent.cs">
+      <Link>ShadowAtlasComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Global\TaskSchedulerComponent.cs">
+      <Link>TaskSchedulerComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\CoordContext.cs">
+      <Link>CoordContext.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Dimension.cs">
+      <Link>Dimension.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Time\TimedEventComponent.cs">
+      <Link>TimedEventComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Time\TimerComponent.cs">
+      <Link>TimerComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Materials\MaskingMaterial.cs">
+      <Link>MaskingMaterial.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Mesh\MeshComponent.cs">
+      <Link>MeshComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Mesh\MeshPickerComponent.cs">
+      <Link>MeshPickerComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Mesh\MeshListComponent.cs">
+      <Link>MeshListComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Cameras\PerspectiveCameraComponent.cs">
+      <Link>PerspectiveCameraComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Global\TextureLoaderComponent.cs">
+      <Link>TextureLoaderComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Time\TimeSecondsComponent.cs">
+      <Link>TimeSecondsComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Global\TonemappingComponent.cs">
+      <Link>TonemappingComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\ConstantPacker.cs">
+      <Link>ConstantPacker.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\CubeMapHelper.cs">
+      <Link>CubeMapHelper.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\IObjMaterialFactory.cs">
+      <Link>IObjMaterialFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\IO\Keyboard.cs">
+      <Link>Keyboard.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\IO\Mouse.cs">
+      <Link>Mouse.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Dimension2.cs">
+      <Link>Dimension2.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\ObjFile.cs">
+      <Link>ObjFile.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\Mesh\ObjToMeshComponent.cs">
+      <Link>ObjToMeshComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\OcclusionHelper.cs">
+      <Link>OcclusionHelper.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Path3D.cs">
+      <Link>Path3D.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Primitives.cs">
+      <Link>Primitives.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\TransformComponent.cs">
+      <Link>TransformComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Components\SphericalBackgroundComponent.cs">
+      <Link>SphericalBackgroundComponent.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\TextureAtlas.cs">
+      <Link>TextureAtlas.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\Vertices.cs">
+      <Link>Vertices.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Engine.BaseModule\VirtualTarget.cs">
+      <Link>VirtualTarget.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\CBAllocator.cs">
+      <Link>CBAllocator.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\Directx11API.cs">
+      <Link>Directx11API.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\Directx11Graphics.cs">
+      <Link>Directx11Graphics.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\Directx11ShaderCompiler.cs">
+      <Link>Directx11ShaderCompiler.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\PSOBlend.cs">
+      <Link>PSOBlend.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\PSODepthStencil.cs">
+      <Link>PSODepthStencil.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\PSOInputLayout.cs">
+      <Link>PSOInputLayout.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\PSORaster.cs">
+      <Link>PSORaster.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\PSOSampler.cs">
+      <Link>PSOSampler.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\PSOShaders.cs">
+      <Link>PSOShaders.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\RenderTargetState.cs">
+      <Link>RenderTargetState.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx9\Directx9API.cs">
+      <Link>Directx9API.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\DirectxCommon\DirectxPadder.cs">
+      <Link>DirectxPadder.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx9\Directx9ShaderCompiler.cs">
+      <Link>Directx9ShaderCompiler.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx11\CachedPipelineState.cs">
+      <Link>CachedPipelineState.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\DirectxCommon\CBuffer.cs">
+      <Link>CBuffer.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\DirectxCommon\CBufferBinding.cs">
+      <Link>CBufferBinding.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\DirectxCommon\DirectxGraphics.cs">
+      <Link>DirectxGraphics.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\DirectxCommon\DirectxUtils.cs">
+      <Link>DirectxUtils.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\GraphicResource.cs">
+      <Link>GraphicResource.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\GraphicResourceID.cs">
+      <Link>GraphicResourceID.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\GraphicsAPI.cs">
+      <Link>GraphicsAPI.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\IGraphicsAPI.cs">
+      <Link>IGraphicsAPI.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Resources\IndexBuffer.cs">
+      <Link>IndexBuffer.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\InvalidGraphicCallException.cs">
+      <Link>InvalidGraphicCallException.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\DFGraphicsFactory.cs">
+      <Link>DFGraphicsFactory.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\DFGraphics.cs">
+      <Link>DFGraphics.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\API\Directx9\Directx9Graphics.cs">
+      <Link>Directx9Graphics.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Resources\Shader.cs">
+      <Link>Shader.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\ConstantBinding.cs">
+      <Link>ConstantBinding.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\EffectBinding.cs">
+      <Link>EffectBinding.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Resources\RenderTarget.cs">
+      <Link>RenderTarget.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Resources\Texture.cs">
+      <Link>Texture.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\InputBinding.cs">
+      <Link>InputBinding.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\IShaderBinding.cs">
+      <Link>IShaderBinding.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\IShaderCompiler.cs">
+      <Link>IShaderCompiler.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\ShaderCompiler.cs">
+      <Link>ShaderCompiler.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\ShaderBindingTable.cs">
+      <Link>ShaderBindingTable.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\ShaderSrcFile.cs">
+      <Link>ShaderSrcFile.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\ShaderPreprocessor.cs">
+      <Link>ShaderPreprocessor.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Shaders\TextureBinding.cs">
+      <Link>TextureBinding.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\UnsupportedAPIException.cs">
+      <Link>UnsupportedAPIException.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\IDFGraphics.cs">
+      <Link>IDFGraphics.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\Resources\VertexBuffer.cs">
+      <Link>VertexBuffer.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics\VertexType.cs">
+      <Link>VertexType.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\AsyncFileLoader.cs">
+      <Link>AsyncFileLoader.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\AsyncRenderLoop.cs">
+      <Link>AsyncRenderLoop.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\BitmapEx.cs">
+      <Link>BitmapEx.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\BlockingQueue.cs">
+      <Link>BlockingQueue.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\BufferList.cs">
+      <Link>BufferList.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\ConsoleSelectionLoop.cs">
+      <Link>ConsoleSelectionLoop.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\HashCode.cs">
+      <Link>HashCode.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\ObservableDictionary.cs">
+      <Link>ObservableDictionary.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\PathEx.cs">
+      <Link>PathEx.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\QuadTree.cs">
+      <Link>QuadTree.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\RenderLoop.cs">
+      <Link>RenderLoop.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\StringEx.cs">
+      <Link>StringEx.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils\VKey.cs">
+      <Link>VKey.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Box.cs">
+      <Link>Box.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Color.cs">
+      <Link>Color.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\ComposedVolumes.cs">
+      <Link>ComposedVolumes.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Cone.cs">
+      <Link>Cone.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Float2.cs">
+      <Link>Float2.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Float2x2.cs">
+      <Link>Float2x2.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Float3.cs">
+      <Link>Float3.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Float3x3.cs">
+      <Link>Float3x3.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Float4.cs">
+      <Link>Float4.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Float4x4.cs">
+      <Link>Float4x4.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\FMath.cs">
+      <Link>FMath.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\FRandom.cs">
+      <Link>FRandom.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\GraphicFloat.cs">
+      <Link>GraphicFloat.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\GraphicInt.cs">
+      <Link>GraphicInt.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\InfiniteVolume.cs">
+      <Link>InfiniteVolume.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Int2.cs">
+      <Link>Int2.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\IVolume.cs">
+      <Link>IVolume.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Rect.cs">
+      <Link>Rect.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Int3.cs">
+      <Link>Int3.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\Sphere.cs">
+      <Link>Sphere.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Graphics.Math\ViewFrustum.cs">
+      <Link>ViewFrustum.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils.Forms\Control3DLogic.cs">
+      <Link>Control3DLogic.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils.Forms\Form3D.cs">
+      <Link>Form3D.cs</Link>
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils.Forms\FormRenderLoop.cs">
+      <Link>FormRenderLoop.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils.Forms\IControl3D.cs">
+      <Link>IControl3D.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils.Forms\Panel3D.cs">
+      <Link>Panel3D.cs</Link>
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils.Forms\TargetControl.cs">
+      <Link>TargetControl.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils.Forms\WindowInputListener.cs">
+      <Link>WindowInputListener.cs</Link>
+    </Compile>
+    <Compile Include="..\Dragonfly.Utils.Forms\WindowResizeEndAdapted.cs">
+      <Link>WindowResizeEndAdapted.cs</Link>
+    </Compile>
+    <!--SRC_LINK_END-->
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dragonfly.Graphics.Wrappers\Dragonfly.Graphics.Wrappers.vcxproj">
+      <Project>{157540d1-d1ae-481c-ab9d-a695bdd36051}</Project>
+      <Name>Dragonfly.Graphics.Wrappers</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Utils.Win32\Dragonfly.Utils.Win32.vcxproj">
+      <Project>{2607c251-5e11-43b8-923f-1e4d383573be}</Project>
+      <Name>Dragonfly.Utils.Win32</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="libz.exe">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <PostBuildEvent>if $(ConfigurationName) == Release (
+  libz inject-dll --assembly $(TargetFileName) --include *.dll --exclude $(TargetFileName) --move
+  del *.pdb
+)
+del libz.exe</PostBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

@@ -1,0 +1,60 @@
+﻿shader: MatrixHelper;
+
+// create a matrix from its colums, which compiles with no MOVs
+// see : http://richiesams.blogspot.com/2014/05/hlsl-turning-float4s-into-float4x4.html
+float4x4 CreateMatrixFromCols(float4 c0, float4 c1, float4 c2, float4 c3)
+{
+	return float4x4(
+		c0.x, c1.x, c2.x, c3.x,
+		c0.y, c1.y, c2.y, c3.y,
+		c0.z, c1.z, c2.z, c3.z,
+		c0.w, c1.w, c2.w, c3.w);
+}
+
+void SetColumn(inout float4x4 m, float4 value, int index)
+{
+	m[0][index] = value.x;
+	m[1][index] = value.y;
+	m[2][index] = value.z;
+	m[3][index] = value.w;
+}
+
+void SetColumn(inout float3x3 m, float3 value, int index)
+{
+	m[0][index] = value.x;
+	m[1][index] = value.y;
+	m[2][index] = value.z;
+}
+
+float4 GetColumn(float4x4 m, int index)
+{
+	return float4(m[0][index], m[1][index], m[2][index], m[3][index]);
+}
+
+// returns true if the specified matrix is a perspective transformation
+bool IsPerspective(float4x4 m)
+{
+	float3 col3 = GetColumn(CAMERA_MATRIX, 3).xyz;
+	return dot(col3, col3) > 0.25;
+}
+
+// returns the size in meters of a texel on the current viewport, with respect to the specified world position and its screen position
+float2 CalcWorldSpaceTexelSize(float3 worldPos, float4 screenPos, float4x4 inverseCameraMatrix, float2 screenTexelSize)
+{
+	float2 screenPlusTexel =screenPos.xy + 2.0 * screenTexelSize * screenPos.w;
+	float4 worldPosX1 = mul(float4(screenPlusTexel.x, screenPos.yzw), inverseCameraMatrix);
+	float4 worldPosY1 = mul(float4(screenPos.x, screenPlusTexel.y, screenPos.zw), inverseCameraMatrix);
+	return float2(distance(worldPos, worldPosX1.xyz / worldPosX1.w), distance(worldPos, worldPosY1.xyz / worldPosY1.w));
+}
+
+// returns the size in meters of a texel on the current viewport, with respect to the specified world position and its screen position
+float2 CalcWorldSpaceTexelSize(float3 worldPos, float4 screenPos)
+{
+	return CalcWorldSpaceTexelSize(worldPos, screenPos, CAMERA_INVERSE, PIX_SIZE);
+}
+
+// returns the size in meters of a texel on the current viewport, with respect to the specified world position
+float2 CalcWorldSpaceTexelSize(float3 worldPos)
+{
+	return CalcWorldSpaceTexelSize(worldPos, mul(float4(worldPos, 1.0), CAMERA_MATRIX));
+}

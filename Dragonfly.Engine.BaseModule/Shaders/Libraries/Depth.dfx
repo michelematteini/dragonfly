@@ -1,0 +1,21 @@
+﻿shader: Depth;
+
+#define F16_MAX_NORM_EXP 32768.0 // 2^15
+
+float EncodeDepth16(float depth)
+{
+	return depth * F16_MAX_NORM_EXP;
+}
+
+float DecodeDepth16(float encodedDepth)
+{
+	return encodedDepth / F16_MAX_NORM_EXP;
+}
+
+// Calculates a z-bias, that jumps the specified number of precision steps given the float precision
+float CalcZBiasOf(float value, float mantissaBitCount, float precisionSteps)
+{
+	float vexp;
+	frexp(value, vexp);
+	return precisionSteps * exp2(vexp - mantissaBitCount);
+}

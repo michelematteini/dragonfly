@@ -1,0 +1,28 @@
+﻿shader: TerrainDataSrcFlat;
+using TerrainDataSrcCommon;
+using ScreenSpace;
+using VertexBaking;
+
+float3 albedo;
+
+// fragment that bake a tile normal and albedo texture
+PS PS_OUT_TERRAIN_TEX TerrainSrcTexFlat(POS4_TEX_NORM IN)
+{
+	PS_OUT_TERRAIN_TEX OUT = (PS_OUT_TERRAIN_TEX)0;
+	OUT.albedo = float4(albedo, 1);
+	OUT.normal = float4(normal, 1);
+	return OUT;
+}
+
+effect TerrainSrcTexFlat {VS = ScreenPass, PS = TerrainSrcTexFlat};
+
+// fragment that bake tile displacementr texture
+PS PS_OUT_TERRAIN_DISPL TerrainSrcDisplFlat(POS4_TEX_NORM IN)
+{
+	PS_OUT_TERRAIN_DISPL OUT = (PS_OUT_TERRAIN_DISPL)0;
+	OUT.displacement.r = 0;
+	return OUT;
+}
+
+effect TerrainSrcDisplFlat{ VS = ScreenPass, PS = TerrainSrcDisplFlat };
+

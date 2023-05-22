@@ -1,0 +1,9 @@
+﻿shader: SolidCommon;
+
+struct SolidVertexIntermediates
+{
+	float4 screenPos;
+	float4 worldPos;
+	float2 texCoords;
+	float3 worldNormal;
+};

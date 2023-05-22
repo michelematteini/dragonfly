@@ -1,0 +1,60 @@
+﻿shader: ColorPicker;
+using Core;
+using ColorConversion;
+using TemplScreenColor;
+
+float hueHeightPerc;
+float previewHeightPerc;
+float svMarginPerc;
+float3 selectedHSV;
+float aspect;
+
+POS3_TEX_NORM GetVertexData(vertex_t IN)
+{
+	return IN;
+}
+
+#define SV_CURSOR_SIZE 0.05
+#define HUE_CURSOR_WIDTH 0.03
+#define CURSOR_THICKENSS 0.01
+
+float4 GetPixelColor(POS4_TEX_NORM IN)
+{
+	float4 OUT = (float4)0;
+	OUT.a = 1.0;
+
+	float2 AR = float2(1.0, aspect);
+
+	// draw hue and sat-value swatches
+	float2 svPickerSize = float2(1.0, 1.0 - hueHeightPerc - 2 * svMarginPerc - previewHeightPerc);
+	float2 svPickerCoords = saturate(float2(IN.texCoords.x, 1.0 - IN.texCoords.y - svMarginPerc - previewHeightPerc) / svPickerSize);
+	float3 svPicker = hsv2rgb(float3(selectedHSV.x, svPickerCoords.x, svPickerCoords.y));
+	float3 huePicker = hsv2rgb(float3(IN.texCoords.x, 1.0, 1.0));
+
+	// combine swatches
+	float swatchesSplitY = hueHeightPerc + 0.5 * svMarginPerc;
+	OUT.rgb = lerp(huePicker, svPicker, step(0, IN.texCoords.y - swatchesSplitY));
+	float colorPreviewSplitY = 1.0 - previewHeightPerc - 0.5 * svMarginPerc;
+	OUT.rgb = lerp(hsv2rgb(selectedHSV), OUT.rgb, step(0, colorPreviewSplitY - IN.texCoords.y));
+
+	// add transparent margins
+	OUT.a *= smoothstep(0.45 * svMarginPerc, 0.5 * svMarginPerc, abs(IN.texCoords.y - swatchesSplitY));
+	OUT.a *= smoothstep(0.45 * svMarginPerc, 0.5 * svMarginPerc, abs(IN.texCoords.y - colorPreviewSplitY));
+
+	// draw sat - value cursor
+	float2 svCursorUV = float2(selectedHSV.y * svPickerSize.x, 1.0 - selectedHSV.z * svPickerSize.y - svMarginPerc - previewHeightPerc);
+	float2 svCursorPos = (IN.texCoords - svCursorUV) / AR;
+	float svCursorDist = abs(length(svCursorPos) - SV_CURSOR_SIZE);
+	OUT.rgb *= smoothstep(0, CURSOR_THICKENSS * 1.5, svCursorDist);
+	OUT.rgb += smoothstep(CURSOR_THICKENSS, 0, svCursorDist);
+
+	// draw hue cursor
+	float2 hueCursorPos = (IN.texCoords - float2(selectedHSV.x, hueHeightPerc * 0.5)) / AR;
+	float hueCursorDist = abs(max(abs(hueCursorPos.x) - 0.03, abs(hueCursorPos.y) - 0.5 * hueHeightPerc / AR.y + CURSOR_THICKENSS * 1.5));
+	OUT.rgb *= smoothstep(0, CURSOR_THICKENSS * 1.5, hueCursorDist);
+	OUT.rgb += smoothstep(CURSOR_THICKENSS, 0, hueCursorDist);
+
+	return OUT;
+}
+
+effect ColorPicker : ScreenColor(POS3_TEX_NORM);

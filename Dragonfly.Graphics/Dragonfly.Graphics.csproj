@@ -1,0 +1,200 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <ProjectGuid>{F0E31E0D-53F5-440E-BF09-AAC09B9EBB92}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Dragonfly.Graphics</RootNamespace>
+    <AssemblyName>Dragonfly.Graphics</AssemblyName>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;TRACING</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>
+    </DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;TRACING</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>
+    </DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Testing|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Testing\</OutputPath>
+    <DefineConstants>TRACE;TRACING</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Testing|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Testing\</OutputPath>
+    <DefineConstants>TRACE;TRACING</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' == 'Testing'">
+    <Reference Include="DSLManager">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\$(Platform)\Debug\DSLManager.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(Configuration)' != 'Testing'">
+    <Reference Include="DSLManager">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\lib\$(Platform)\$(Configuration)\DSLManager.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="API\Common\CmdListCoordinator.cs" />
+    <Compile Include="API\Common\FrameDeferredReleaseList.cs" />
+    <Compile Include="API\Common\ProgramDB.cs" />
+    <Compile Include="API\Common\PSOStateFields.cs" />
+    <Compile Include="API\Common\ViewportState.cs" />
+    <Compile Include="API\Directx11\CBAllocator.cs" />
+    <Compile Include="API\Directx11\CBufferInstance.cs" />
+    <Compile Include="API\Directx11\Directx11API.cs" />
+    <Compile Include="API\Directx11\Directx11CmdList.cs" />
+    <Compile Include="API\Directx11\Directx11Graphics.cs" />
+    <Compile Include="API\Directx11\Directx11ShaderCompiler.cs" />
+    <Compile Include="API\Directx11\PSOBlend.cs" />
+    <Compile Include="API\Directx11\PSODepthStencil.cs" />
+    <Compile Include="API\Directx11\PSOInputLayout.cs" />
+    <Compile Include="API\Directx11\PSORaster.cs" />
+    <Compile Include="API\Directx11\PSOSampler.cs" />
+    <Compile Include="API\Directx11\PSOShaders.cs" />
+    <Compile Include="API\Directx11\RenderTargetState.cs" />
+    <Compile Include="API\Directx11\TexBindingState.cs" />
+    <Compile Include="API\Directx12\CBufferCollection.cs" />
+    <Compile Include="API\Directx12\Directx12API.cs" />
+    <Compile Include="API\Directx12\Directx12Graphics.cs" />
+    <Compile Include="API\Directx12\Directx12PSOCache.cs" />
+    <Compile Include="API\Directx12\Directx12RTState.cs" />
+    <Compile Include="API\Directx12\Directx12ShaderCompiler.cs" />
+    <Compile Include="API\Directx12\Directx12StaticSamplers.cs" />
+    <Compile Include="API\Directx12\VersionedCBuffer.cs" />
+    <Compile Include="API\Directx12\InstancesVBuffer.cs" />
+    <Compile Include="API\Directx9\Directx9API.cs" />
+    <Compile Include="API\Directx9\Directx9CmdList.cs" />
+    <Compile Include="API\Directx9\Directx9ShaderParamValue.cs" />
+    <Compile Include="API\Common\DirectxPadder.cs" />
+    <Compile Include="API\Directx9\Directx9ShaderCompiler.cs" />
+    <Compile Include="API\Common\CachedPipelineState.cs" />
+    <Compile Include="API\Common\CBuffer.cs" />
+    <Compile Include="API\Directx11\CBufferBinding.cs" />
+    <Compile Include="API\Common\DirectxGraphics.cs" />
+    <Compile Include="API\Common\DirectxUtils.cs" />
+    <Compile Include="API\Common\GlobalTexManager.cs" />
+    <Compile Include="GraphicResource.cs" />
+    <Compile Include="GraphicResourceID.cs" />
+    <Compile Include="GraphicsAPI.cs" />
+    <Compile Include="IGraphicsAPI.cs" />
+    <Compile Include="Resources\CommandList.cs" />
+    <Compile Include="Resources\IndexBuffer.cs" />
+    <Compile Include="InvalidGraphicCallException.cs" />
+    <Compile Include="DFGraphicsFactory.cs" />
+    <Compile Include="DFGraphics.cs" />
+    <Compile Include="API\Directx9\Directx9Graphics.cs" />
+    <Compile Include="Resources\Shader.cs" />
+    <Compile Include="Resources\GraphicSurface.cs" />
+    <Compile Include="Shaders\ConstantBinding.cs" />
+    <Compile Include="Shaders\DFXShaderCompiler.cs" />
+    <Compile Include="Shaders\EffectBinding.cs" />
+    <Compile Include="Resources\RenderTarget.cs" />
+    <Compile Include="Resources\Texture.cs" />
+    <Compile Include="Shaders\InputBinding.cs" />
+    <Compile Include="Shaders\IShaderBinding.cs" />
+    <Compile Include="Shaders\ShaderCompiler.cs" />
+    <Compile Include="Shaders\ShaderBindingTable.cs" />
+    <Compile Include="Shaders\ShaderSrcFile.cs" />
+    <Compile Include="Shaders\TextureBinding.cs" />
+    <Compile Include="UnsupportedAPIException.cs" />
+    <Compile Include="IDFGraphics.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Resources\VertexBuffer.cs" />
+    <Compile Include="VertexType.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dragonfly.Graphics.Math\Dragonfly.Graphics.Math.csproj">
+      <Project>{80a394c6-b086-4676-b997-a67275f5bbaa}</Project>
+      <Name>Dragonfly.Graphics.Math</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Graphics.Wrappers\Dragonfly.Graphics.Wrappers.vcxproj">
+      <Project>{157540D1-D1AE-481C-AB9D-A695BDD36051}</Project>
+      <Name>Dragonfly.Graphics.Wrappers</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Utils.Win32\Dragonfly.Utils.Win32.vcxproj">
+      <Project>{2607c251-5e11-43b8-923f-1e4d383573be}</Project>
+      <Name>Dragonfly.Utils.Win32</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Utils\Dragonfly.Utils.csproj">
+      <Project>{5440138A-E0B3-4B32-9713-38DEF2C4FF11}</Project>
+      <Name>Dragonfly.Utils</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64' Or '$(Configuration)|$(Platform)' == 'Testing|x64'">
+    <Content Include="WinPixEventRuntime.dll">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+  <!--CSharp Exporter (Do not edit)-->
+  <!--End Group-->
+</Project>

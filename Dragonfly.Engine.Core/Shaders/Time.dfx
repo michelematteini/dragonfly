@@ -1,0 +1,25 @@
+﻿shader: Time;
+using PreciseFloat;
+
+global float2 preciseSeconds;
+
+float GetSeconds()
+{
+	return PF_ToFloat(preciseSeconds);
+}
+
+float GetSecondsFrom(float2 preciseStartTime)
+{
+	return PF_ToFloat(PF_Sub(preciseSeconds, preciseStartTime));
+}
+
+float GetTimeRangePercent(float4 preciseTimeRange)
+{
+	return saturate(PF_ToFloat(PF_Sub(preciseSeconds, preciseTimeRange.xy)) / PF_ToFloat(PF_Sub(preciseTimeRange.zw, preciseTimeRange.xy)));
+}
+
+float GetFracTime(float frequency)
+{
+	float2 precisePeriods = PF_Mul(preciseSeconds, frequency);
+	return PF_ToFloat(precisePeriods);
+}

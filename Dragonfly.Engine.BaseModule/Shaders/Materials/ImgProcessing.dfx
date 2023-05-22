@@ -1,0 +1,46 @@
+﻿shader: ImageProcessing;
+using Core;
+using Layouts;
+using TemplScreenColor;
+
+texture filteredTex : NoMipMaps, Anisotropic, Clamp;
+texture noFilterTex : NoFilter, NoMipMaps, Clamp;
+float4x4 inputMatrix1;
+float4 inputVector1;
+float4 inputVector2;
+variant fx : ImgProcCopy, ImgProcHeatmap;
+
+POS3_TEX_NORM GetVertexData(vertex_t IN)
+{
+	return IN;
+}
+
+float3 ValueToHeatmapColor(float value)
+{
+	float3 heat = float3(
+		4.0 * abs(value - 0.75),
+		2.3 * abs(value - 0.50),
+		4.0 * abs(value - 0.25)
+	);
+	return 1.0 - heat * heat;
+}
+
+float4 GetPixelColor(POS4_TEX_NORM IN)
+{
+	float4 OUT = (float4)0;
+	
+#if fx == ImgProcCopy
+	OUT = sample(filteredTex, IN.texCoords);
+	OUT = mul(OUT, inputMatrix1);
+
+#elif fx == ImgProcHeatmap
+	OUT = sample(filteredTex, IN.texCoords);
+	OUT.rgb = ValueToHeatmapColor(dot(OUT, inputVector1) + inputVector2.x);
+	OUT.a = 1.0;
+
+#endif
+
+	return OUT;
+}
+
+effect ImgProcessing : ScreenColor(POS3_TEX_NORM);

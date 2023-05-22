@@ -1,0 +1,138 @@
+﻿shader: RayTracing;
+using Core;
+using MatrixHelper;
+using Math;
+using Noise;
+
+// given screen coords in clip space [-1; 1], returns the direction in world space of the ray passing through that pixel, using the current camera projection. 
+float3 RayDirFromClipCoords(float2 clipSpaceCoords)
+{
+	// retrieve rotation matrix from camera
+	float3 ax = GetColumn(CAMERA_MATRIX, 0).xyz;
+	float3 ay = GetColumn(CAMERA_MATRIX, 1).xyz;
+	float2 tanScale = 1.0 / float2(length(ax), length(ay));
+	ax *= tanScale.x;
+	ay *= tanScale.y;
+
+	float3 camSpaceDir = normalize(float3(clipSpaceCoords.x * tanScale.x, clipSpaceCoords.y * tanScale.y, 1.0));
+
+	// rotate dir to world space
+	return ax * camSpaceDir.x + ay * camSpaceDir.y + CAMERA_DIR * camSpaceDir.z;
+}
+
+/// <summary>
+/// Given clip space depth, screen space texture coords, and the inverse camera matrix, calculates the world position.
+/// </summary>
+float3 ClipDepthToWorldPos(float depth, float2 screenCoords, float4x4 invCameraMatrix)
+{
+	float4 clipSpacePos = float4(float2(2.0, -2.0) * (screenCoords - 0.5), depth, 1.0);
+	float4 worldPos = mul(clipSpacePos, invCameraMatrix);
+	float nw = nonzero(worldPos.w, 1.0e-14); // avoid w = 0 division, can happen with infinitely far plane
+	return worldPos.xyz / nw;
+}
+
+/// <summary>
+/// Return directions on an hemisphere with a specified distribution.
+/// </summary>
+/// <param name="normal">The hemisphere direction.</param>
+/// <param name="sampleIndex">The index of the sample.</param>
+/// <param name="cosAngleDistr">A value between 0 and 1 used to distribute the samples (the cosine of the vertical angle), where 1 take a sample at the normal, and 0 at a location orthogonal to it</param>
+/// /// <param name="rotation">A rotation value that can be used to randomize the sampling pattern.</param>
+float3 HemisphereSample(float3 normal, int sampleIndex, float cosAngleDistr, float rotation)
+{
+	// calc sample direction
+	float alpha = (rotation + sampleIndex) * PHI * TWO_PI; // random y-rotations, spaced by golden ratio.
+	float sin_alpha;
+	float cos_alpha;
+	sincos(alpha, sin_alpha, cos_alpha);
+	float cos_theta = cosAngleDistr;
+	float sin_theta = sqrt(max(EPS, 1 - cos_theta * cos_theta));
+	float3 sampleDir = float3(sin_theta * cos_alpha, cos_theta, sin_theta * sin_alpha);
+
+	// calc rotation basis for the hemisphere specified by the normal vector
+	float3 up = float3(0, 1, 0) + step(0.9999, abs(normal.y)) * float3(1, -1, 0);
+	float3 az = normalize(cross(up, normal));
+	float3 ax = cross(normal, az);
+
+	return sampleDir.x * ax + sampleDir.y * normal + sampleDir.z * az;
+}
+
+/// <summary>
+/// Return uniformly distributed directions on an hemisphere.
+/// </summary>
+/// <param name="normal">The hemisphere direction.</param>
+/// <param name="sampleIndex">The index of the sample.</param>
+/// <param name="sampleCount">The number of total samples needed.</param>
+/// <returns></returns>
+float3 HemisphereUniformSample(float3 normal, int sampleIndex, int sampleCount)
+{
+	float x = (float)sampleIndex / (float)(sampleCount - 1);
+	float cos_theta = cos(PI_OVER_2 * sqrt(x));
+	return HemisphereSample(normal, sampleIndex, cos_theta, 0);
+}
+
+float3 SphereUniformSample(float3 normal, int sampleIndex, int sampleCount)
+{
+	float x = 2.0 * sampleIndex / (sampleCount - 1.0);
+	float cosTheta;
+	float2 theta = PI_OVER_2 * (float2(1.0, -1.0) *	sqrt(float2(x, 2.0 - x)) + float2(0.0, 2.0));
+	if (x > 1.0) // select in theta.x the correct hemisphere angle
+		theta.x = theta.y;
+	return HemisphereSample(normal, sampleIndex, cos(theta.x), 0);
+}
+
+float LinePointDistance(float3 linePoint, float3 lineDir, float3 pointPos)
+{
+	float halfIntDist = dot(pointPos - linePoint, lineDir);
+	float3 halfIntVec = halfIntDist * lineDir;
+	float3 halfIntPoint = halfIntVec + linePoint;
+	float3 halfIntFromCenter = halfIntPoint - pointPos;
+	return length(halfIntFromCenter);
+}
+
+float RayPointDistance(float3 rayStart, float3 rayDir, float3 pointPos)
+{
+	float halfIntDist = dot(pointPos - rayStart, rayDir);
+	float3 halfIntVec = max(0, halfIntDist) * rayDir;
+	float3 halfIntPoint = halfIntVec + rayStart;
+	float3 halfIntFromCenter = halfIntPoint - pointPos;
+	return length(halfIntFromCenter);
+}
+
+bool LineSphereIntersection(float3 linePoint, float3 lineDir, float3 sphereCenter, float sphereRadius, out float3 intersection1, out float3 intersection2)
+{
+	intersection1 = (float3)0.0;
+	intersection2 = (float3)0.0;
+	float halfIntDist = dot(sphereCenter - linePoint, lineDir);
+	float3 halfIntVec = halfIntDist * lineDir;
+	float3 halfIntPoint = halfIntVec + linePoint;
+	float3 halfIntFromCenter = (halfIntPoint - sphereCenter) / sphereRadius;
+	float halfIntDistFromCenter2 = dot(halfIntFromCenter, halfIntFromCenter);
+	
+	if (halfIntDistFromCenter2 > 1.0)
+	{
+		return false; // no intersection
+	}
+	else
+	{
+		float halfChordLen = sqrt(1.0 - halfIntDistFromCenter2);
+		float3 halfChord = halfChordLen * lineDir * sphereRadius;
+		intersection1 = halfIntPoint - halfChord;
+		intersection2 = halfIntPoint + halfChord;
+		return true;
+	}	
+}
+
+bool RaySphereIntersection(float3 rayStart, float3 rayDir, float3 sphereCenter, float sphereRadius, out float3 intersection1, out float3 intersection2)
+{
+	if (LineSphereIntersection(rayStart, rayDir, sphereCenter, sphereRadius, out intersection1, out intersection2))
+	{
+		// check that the ray is intersecting in the specified direction and not before the starting point
+		float intersection2Dist = dot(intersection2 - rayStart, rayDir);
+		return intersection2Dist >= 0;
+	}
+	else
+	{
+		return false;
+	}
+}

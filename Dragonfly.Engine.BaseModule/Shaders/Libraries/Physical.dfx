@@ -1,0 +1,110 @@
+﻿shader: Physical;
+using Math;
+using RayTracing;
+using EnvMaps;
+
+// Converts the roughness from physical materials to the ggx distribution roughness
+float MaterialRoughnessToGGX(float matRoughness)
+{
+	return matRoughness * matRoughness;
+}
+
+/// <summary>
+/// Fresnel schlick approximation 
+/// </summary>
+/// <param name="cosTheta">Cosine of the viewing angle</param>
+float3 F_schlick(float3 f0, float cosTheta)
+{
+	return f0 + (1 - f0) * pow5(1 - cosTheta);
+}
+
+/// <summary>
+/// GGX surface normal distribution approximation  
+/// </summary>
+/// <param name="cosNH">cosine of the angle between the macro surface normal and the required facet normal</param>
+float D_ggx(float ggxRoughness, float cosNH)
+{
+	float r2 = ggxRoughness * ggxRoughness;
+	float den = cosNH * cosNH * (r2 - 1.0) + 1.0;
+	return r2 / (PI * den * den);
+}
+
+float G_schlick_backmann_dir(float ggxRoughness, float cosTheta)
+{
+	return cosTheta / (cosTheta * (1 - ggxRoughness) + ggxRoughness);
+}
+
+/// <summary>
+/// Geometric facet masking function approximation by schlick / backmann 
+/// </summary>
+/// <param name="cosTheta_i">Cosine of the incident angle of the light on the surface (will account for facets shadowing)</param>
+/// <param name="cosTheta_o">Cosine of the angle of the light reaching the viewer (will account for facets masking)</param>
+/// <returns></returns>
+float G_schlick_backmann(float ggxRoughness, float cosTheta_i, float cosTheta_o)
+{
+	return G_schlick_backmann_dir(ggxRoughness, cosTheta_i) * G_schlick_backmann_dir(ggxRoughness, cosTheta_o);
+}
+
+float2 D_ggx_importance(float2 x, float ggxRoughness)
+{
+	return sqrt((1 - x) / (1 + (ggxRoughness * ggxRoughness - 1) * x));
+}
+
+float D_ggx_importance(float x, float ggxRoughness)
+{
+	return sqrt((1 - x) / (1 + (ggxRoughness * ggxRoughness - 1) * x));
+}
+
+#define GGX_LOD_OFFSET_MUL 2.0
+#define GGX_MAX_MIPMAP 8
+
+/// <summary>
+/// Take of sample ad the specified env map using importance sampling with GGX distribution.
+/// </summary>
+/// <param name="envMap">The env map in cube2d format to be sampled.</param>
+/// <param name="envMapTexelSize">The env map texel size</param>
+/// <param name="n">Normal direction in which the samples are oriented.</param>
+/// <param name="index">Index of the sample.</param>
+/// <param name="sampleCount">Total samples that will be taken, for a correct coverage this function should be called the number of times specified in this param.</param>
+/// <param name="ggxRoughness">The ggx roughness (which is the material roughness squared) value</param>
+/// <returns>The light contribution of this sample, to be normalized by its w component after adding together all the needed samples.</returns>
+float4 SampleCube2dGGX(texture envMap, float2 envMapTexelSize, float3 n, int index, int sampleCount, float ggxRoughness)
+{
+	// calc halft vector direction with GGX importance sampling
+	float2 x = float2(index, max(0, index - 1)) / sampleCount; // calc two sample at the same time to get the derivative later
+	float2 cos_theta = D_ggx_importance(x, ggxRoughness);
+	float3 h = HemisphereSample(n, index, cos_theta.x, Noise3x2Point(2.0 * n / envMapTexelSize.y, 0).x);
+
+	// hemisphere coverage of the current sample
+	float2 sampleCov = acos(cos_theta) / PI_OVER_2; 
+	sampleCov *= sampleCov;
+
+	// cal texel count in lod0 hemisphere
+	float2 faceEdgeTexelCount = 1 / (envMapTexelSize * float2(4, 2)) - 2; // rescaled size removing the edge pixel
+	float hemisphereTexelCount = faceEdgeTexelCount.x * faceEdgeTexelCount.y * 3;
+
+	// calc a lod to be sampled based on the importance sample coverage
+	float sampleCovTexels = (sampleCov.x - sampleCov.y) * hemisphereTexelCount;
+	float lod = clamp(log2(sqrt(sampleCovTexels)) * GGX_LOD_OFFSET_MUL, 0, GGX_MAX_MIPMAP);
+
+	// calc brdf vectors from half-vector and hemisphere normal, fixing v = n as approximation
+	float3 l = 2 * dot(n, h) * h - n;
+	float n_dot_l = max(0, dot(n, l));
+		
+	// sample env map, if this sample contribute to the light in v (n) direction
+	float4 indirectSpec = 0;
+	if (n_dot_l > 0)
+	{
+		indirectSpec = float4(sampleHDRCube2DLevel(envMap, envMapTexelSize, l, lod), n_dot_l);
+	}
+	
+	return indirectSpec;
+}
+
+#define MIP_ROUGHNESS_GAMMA 1.0
+
+// Converts material roughness to the env map mipmap. must be the inverse of the one in CompBakerCube2GGX.cs
+float MaterialRoughnessToMipmap(float matRoughness)
+{
+	return GGX_MAX_MIPMAP * gammaInv(matRoughness, MIP_ROUGHNESS_GAMMA);
+}

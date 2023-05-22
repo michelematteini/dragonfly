@@ -1,0 +1,96 @@
+﻿shader: SSAtmosphere;
+using RayTracing; 
+using AtmosphericScattering;
+
+texture ssaParams : NoFilter, Clamp, NoMipMaps;
+texture ssaLutAtlas;
+texture ssaIrradianceLutAtlas;
+int ssaCount;
+float3 rgbWavelengthsInv4;
+float rayleighScatteringConst;
+float mieScatteringConst;
+float irradianceScatteringConst;
+float irradianceIntensity;
+
+AtmosphereParams FetchSSAtmoParams(float2 uv)
+{
+    float4 p0 = sampleLevel0(ssaParams, uv);
+    uv.x += texelSize(ssaParams).x;
+    float4 p1 = sampleLevel0(ssaParams, uv);
+    uv.x += texelSize(ssaParams).x;
+    float4 p2 = sampleLevel0(ssaParams, uv);
+    uv.x += texelSize(ssaParams).x;
+    float4 p3 = sampleLevel0(ssaParams, uv);
+    uv.x += texelSize(ssaParams).x;
+    float4 p4 = sampleLevel0(ssaParams, uv);
+    uv.x += texelSize(ssaParams).x;
+    float4 p5 = sampleLevel0(ssaParams, uv);
+    
+    AtmosphereParams params;
+    params.location = p0.xyz;
+    params.worldPosFlattenBlend = p0.w;
+    params.maxDensityRadius = p1.x;
+    params.zeroDensityRadius = p1.y;
+    params.heightDensityCoeff = p1.z;
+    params.lightDir = p2.xyz;
+    params.mieDirFactor = p2.w;
+    params.lightIntensity = p3.rgb;
+    params.opticalDistLutScaleOffset = p4;
+    params.irradianceLutScaleOffset = p5;
+    params.rgbWavelengthsInv4 = rgbWavelengthsInv4;
+    params.rayleighScatteringConst = rayleighScatteringConst;
+    params.mieScatteringConst = mieScatteringConst;
+    params.irradianceScatteringConst = irradianceScatteringConst;
+    params.irradianceIntensity = irradianceIntensity;
+    return params;
+}
+
+void ApplyAtmosphere(float3 worldPos, float3 viewPos, AtmosphereParams atmoParams, inout float4 hdrColor)
+{
+    float3 viewRay = worldPos - viewPos;
+    float viewRayLen = length(viewRay);
+    float3 viewDir = viewRay / viewRayLen;
+    
+    float3 traceStart, traceEnd;
+    if(!LineSphereIntersection(viewPos, viewDir, atmoParams.location, atmoParams.zeroDensityRadius, out traceStart, out traceEnd))
+        return; // early out if the view ray do not intersect the atmosphere
+    
+    float atmoEndDist = dot(traceEnd - viewPos, viewDir);
+    
+    if (atmoEndDist < 0)
+      return; // the view ray is intersecting only behing the viewer, skip  
+    
+    // if the WP is inside the atmosphere, trace only up to the WP
+    if (atmoEndDist > viewRayLen)
+	{
+		traceEnd = worldPos;
+        
+        // if specified, project the WP on the planet surface
+        // can be used from far away to avoid atmosphere artifacts due to low tessellation
+        if(atmoParams.worldPosFlattenBlend > 0)
+		{
+			float3 flatWP = normalize(worldPos - atmoParams.location) * atmoParams.maxDensityRadius + atmoParams.location;
+            traceEnd = lerp(traceEnd, flatWP, atmoParams.worldPosFlattenBlend);
+            // add a quick fake (and incorrect) shift to the trace start, to avoid it being dependent on geometry, which also creates artifacts
+            float3 wpDiff = flatWP - worldPos;			
+			traceStart += wpDiff * atmoParams.worldPosFlattenBlend;
+		}
+	}
+    
+    // if the view position is inside the atmosphere, start tracing from the view
+    if (dot(traceStart - viewPos, viewDir) < 0)
+        traceStart = viewPos;
+    
+    hdrColor.rgb += TraceAtmosphericScattering(traceStart, traceEnd, atmoParams, ssaLutAtlas, ssaIrradianceLutAtlas);
+}
+
+void ApplyAllAtmospheres(float3 worldPos, float3 viewPos, inout float4 hdrColor)
+{
+    float2 atmoParamsUV = 0.5 * texelSize(ssaParams);
+    [loop] for (int i = 0; i < ssaCount; i++)
+    {
+        AtmosphereParams atmoParams = FetchSSAtmoParams(atmoParamsUV);
+        ApplyAtmosphere(worldPos, viewPos, atmoParams, inout hdrColor);
+        atmoParamsUV.y += texelSize(ssaParams).y;
+    }
+}

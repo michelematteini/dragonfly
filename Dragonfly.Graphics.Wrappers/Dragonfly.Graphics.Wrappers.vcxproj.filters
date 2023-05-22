@@ -1,0 +1,148 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Header Files\Directx12">
+      <UniqueIdentifier>{335d784f-9404-46c3-9919-71dd60a0ed54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Directx12">
+      <UniqueIdentifier>{9db42880-fc14-46db-aebc-81f6499fdcc3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\Directx11">
+      <UniqueIdentifier>{c277ea24-8f7b-4ed9-af9c-7d75f5573d8a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\Directx11">
+      <UniqueIdentifier>{23e7073c-2945-481f-928e-5faa80b693e3}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="resource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DirectxCommon.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\d3dx12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\DF_CommandList12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\DF_D3D12Device.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\DF_DescriptorHeap12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\DF_Directx3D12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\DF_Fence12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\DF_Resource12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\DX12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\DF_PipelineState12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="WrlToAtlComPtr.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="DDSTextureLoader11.h">
+      <Filter>Header Files\Directx11</Filter>
+    </ClInclude>
+    <ClInclude Include="ScreenGrab11.h">
+      <Filter>Header Files\Directx11</Filter>
+    </ClInclude>
+    <ClInclude Include="WICTextureLoader11.h">
+      <Filter>Header Files\Directx11</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\DDSTextureLoader12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Directx12\WICTextureLoader12.h">
+      <Filter>Header Files\Directx12</Filter>
+    </ClInclude>
+    <ClInclude Include="Pix.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AssemblyInfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DX9.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="DirectxCommon.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\DF_CommandList12.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\DF_D3D12Device.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\DF_DescriptorHeap12.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\DF_Directx3D12.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\DF_Fence12.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\DF_Resource12.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\DF_PipelineState12.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\DX12.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+    <ClCompile Include="DDSTextureLoader11.cpp">
+      <Filter>Source Files\Directx11</Filter>
+    </ClCompile>
+    <ClCompile Include="DX11.cpp">
+      <Filter>Source Files\Directx11</Filter>
+    </ClCompile>
+    <ClCompile Include="ScreenGrab11.cpp">
+      <Filter>Source Files\Directx11</Filter>
+    </ClCompile>
+    <ClCompile Include="WICTextureLoader11.cpp">
+      <Filter>Source Files\Directx11</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\DDSTextureLoader12.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+    <ClCompile Include="Directx12\WICTextureLoader12.cpp">
+      <Filter>Source Files\Directx12</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="app.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="app.ico">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,17 @@
+﻿shader: ExponentialFog;
+using Volumetrics;
+
+variant fogEnabled;
+float3 fogColor;
+float fogExponent;
+float3 fogGradDir;
+float fogGradExponent;
+float fogGroundLevel;
+
+void ApplyExpFog(float3 worldPos, float3 cameraPos, inout float4 hdrColor)
+{
+#ifdef fogEnabled
+    float fogDistance = ExpFogVolumeDistance(cameraPos, worldPos, fogGradDir, fogGroundLevel, fogGradExponent);
+    hdrColor.rgb = ExpFog(hdrColor.rgb, fogColor, fogDistance, fogExponent);
+#endif
+}

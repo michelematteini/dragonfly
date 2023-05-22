@@ -1,0 +1,16 @@
+﻿shader: ShadowMapBiasing;
+
+float3 depthBiases;
+
+#define PRECISION_BIAS 0
+#define NORMAL_BIAS 1
+#define QUANTIZATION_BIAS 2
+
+ShadowBiasConfig GetShadowBias()
+{
+	ShadowBiasConfig biasConfig;
+	biasConfig.precisionBias = depthBiases[PRECISION_BIAS];
+	biasConfig.normalBias = depthBiases[NORMAL_BIAS];
+	biasConfig.quantizationBias = depthBiases[QUANTIZATION_BIAS];
+	return biasConfig;
+}

@@ -1,0 +1,60 @@
+﻿shader: TemplLitSolid;
+
+using TemplSolid;
+using LightsCommon;
+using LightFilterCommon;
+
+template<struct ShadingParams> ShadingParams CalcShadingParams(SolidPixelInputs IN);
+
+template<struct ShadingParams> float3 CalcLightContribution(float3 l, float3 lightIntensity, ShadingParams shadingParams);
+
+template<struct ShadingParams> float3 CalcAdditionalContributions(ShadingParams shadingParams);
+
+template<struct ShadingParams> float3 GetNormal(ShadingParams shadingParams);
+
+
+float4 GetPixelColor(SolidPixelInputs IN)
+{
+	float4 OUT = (float4)0;
+
+	ShadingParams shadingParams = CalcShadingParams(IN);
+
+	// sum light contributions
+	float3 totalRadiance = (float3)0;
+	[loop] for (int i = 0; i < lightCount; i++)
+	{
+		LIGHT light = GetLight(i); // light parameters
+		float3 l_i = light.color; // light intensity
+		float3 l = -light.dir; // light vector
+
+		// light direction and attenuation for non-directional lights 
+		if (light.type != DIRECTIONAL_LIGHT)
+		{
+			l = light.pos - IN.worldPos;
+			l_i = l_i / dot(l, l);
+			l = normalize(l);
+		}
+		// light cone attenuation for spot lights
+		if (light.type == SPOT_LIGHT)
+		{
+			l_i *= saturate((dot(-l, light.dir) - light.cosInOutRadius.y) / (light.cosInOutRadius.x - light.cosInOutRadius.y));
+		}
+
+		// direct shadows
+		l_i *= GetShadowMul(float4(IN.worldPos, 1.0), light, l, GetNormal(shadingParams));
+						
+		// indirect shadows and other filters
+		l_i *= GetLightColorFilter(i, IN.screenUV);
+
+		totalRadiance += CalcLightContribution(l, l_i, shadingParams);
+	}
+
+	// sum additional contributions (e.g. ambient, indirect, etc)
+	totalRadiance += CalcAdditionalContributions(shadingParams);
+
+	// hdr encoding
+	OUT = EncodeRGBE(totalRadiance);
+	return OUT;
+}
+
+template effect LitSolid : Solid;

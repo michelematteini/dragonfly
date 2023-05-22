@@ -1,0 +1,36 @@
+﻿shader: TemplScreenColor;
+
+using Core;
+using Layouts;
+
+template POS3_TEX_NORM GetVertexData(vertex_t IN);
+
+VS POS4_TEX_NORM ScreenColor(vertex_t IN)
+{
+	POS3_TEX_NORM vertex = GetVertexData(IN);
+	POS4_TEX_NORM OUT = (POS4_TEX_NORM)0;
+
+	OUT.position = mul(float4(vertex.position, 1.0), WORLD_MATRIX);
+	OUT.position = mul(OUT.position, CAMERA_MATRIX);
+	OUT.texCoords = vertex.texCoords;
+	OUT.normal = vertex.normal;
+
+#ifdef Directx9
+	OUT.position.xy -= float2(PIX_SIZE.x, -PIX_SIZE.y) * OUT.position.w; // correct half pixel rasterization offset
+#endif
+
+	return OUT;
+}
+
+template float4 GetPixelColor(POS4_TEX_NORM IN);
+
+PS RT_COLOR ScreenColor(POS4_TEX_NORM IN)
+{
+	RT_COLOR OUT = (RT_COLOR)0;
+	OUT.color = GetPixelColor(IN);
+	return OUT;
+}
+
+// Template for a screen pass which outputs to a color buffer
+template effect ScreenColor{ VS = ScreenColor, PS = ScreenColor };
+

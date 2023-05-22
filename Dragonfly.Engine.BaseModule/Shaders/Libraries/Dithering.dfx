@@ -1,0 +1,14 @@
+﻿shader: Dithering;
+using Noise;
+using Time;
+
+// Returns a pixel-scaled noise that will hide the specified quantization step when added to a color
+float ScreenDithering(float2 screenCoords, float2 pixSize, float quantizationStep)
+{
+	float frameID = frac(GetFracTime(1.0) * 120.0); // update noise at 120Hz
+	float4 noiseChannels = Noise2x4Point((screenCoords + frameID) / pixSize);
+	// triangular noise, range: [-0.5, 1.5]
+	// see: "Optimal Dither and Noise Shaping in Image Processing"
+	// and: https://www.youtube.com/watch?v=RdN06E6Xn9E&t=132s
+	return (noiseChannels.x + noiseChannels.y - 0.5) * quantizationStep;
+}

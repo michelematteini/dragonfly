@@ -1,0 +1,361 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{D42A036B-7BF4-44A0-B48A-7CCADC85116E}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Dragonfly.BaseModule</RootNamespace>
+    <AssemblyName>Dragonfly.Modules.BaseModule</AssemblyName>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>
+    </DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>
+    </DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Testing|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Testing\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Testing|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Testing\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Atmosphere\CompAtmoBakingManager.cs" />
+    <Compile Include="Atmosphere\CompAtmosphereTable.cs" />
+    <Compile Include="Atmosphere\CompMtlAtmosphereIrradianceLUTCache.cs" />
+    <Compile Include="Atmosphere\CompMtlAtmosphereLightFilter.cs" />
+    <Compile Include="Lights\CompDirectionalLightFilterPass.cs" />
+    <Compile Include="Bakers\BakerScreenSpacePool.cs" />
+    <Compile Include="Bakers\CompBakedGeometry.cs" />
+    <Compile Include="Bakers\CompBakerBrdfLUT.cs" />
+    <Compile Include="Bakers\CompBakerScreenSpace.cs" />
+    <Compile Include="Bakers\CompBakerVertexArray.cs" />
+    <Compile Include="Bakers\CompVerticesToVB.cs" />
+    <Compile Include="Atmosphere\CompAtmoLightFilter.cs" />
+    <Compile Include="CompCumulativeMouseWheel.cs" />
+    <Compile Include="CompFutureWorldPosition.cs" />
+    <Compile Include="CompTextureBuffer.cs" />
+    <Compile Include="CompValueHistory.cs" />
+    <Compile Include="EngineModule\BaseModShaderTemplates.cs" />
+    <Compile Include="Lights\ExposureHelper.cs" />
+    <Compile Include="Lights\LightTable.cs" />
+    <Compile Include="Atmosphere\CompMtlAtmosphereDepthLUT.cs" />
+    <Compile Include="Atmosphere\CompMtlAtmosphereIrradianceLUT.cs" />
+    <Compile Include="Atmosphere\CompMtlAtmosphereLightColorLUT.cs" />
+    <Compile Include="Materials\CompMtlImage.cs" />
+    <Compile Include="Materials\CompMtlTemplatePhysical.cs" />
+    <Compile Include="CompTimeSmoothing.cs" />
+    <Compile Include="CompNode.cs" />
+    <Compile Include="EngineModule\BaseModPassClasses.cs" />
+    <Compile Include="EngineModule\BaseModSettings.cs" />
+    <Compile Include="CompScreenPass.cs" />
+    <Compile Include="Events\CompEventAnd.cs" />
+    <Compile Include="Events\CompEventRtSnapshotReady.cs" />
+    <Compile Include="Global\CompRandom.cs" />
+    <Compile Include="GPUNoise.cs" />
+    <Compile Include="Atmosphere\CompAtmosphere.cs" />
+    <Compile Include="Materials\Modules\MtlModAtmosphere.cs" />
+    <Compile Include="Materials\Modules\MtlModExpFog.cs" />
+    <Compile Include="Materials\Modules\MtlModIndirectLighting.cs" />
+    <Compile Include="Materials\Modules\MtlModSSAtmosphere.cs" />
+    <Compile Include="Materials\Modules\MtlModSSFlare.cs" />
+    <Compile Include="Shadows\ShadowCameraCollider.cs" />
+    <Compile Include="Shadows\ShadowmapPacker.cs" />
+    <Compile Include="Textures\AtlasLayout.cs" />
+    <Compile Include="Textures\AtlasLayoutFixedGrid.cs" />
+    <Compile Include="Textures\CompTextureLoader.cs" />
+    <Compile Include="GUI\CompUiDragHandle.cs" />
+    <Compile Include="GUI\Controls\CompUiCtrlCheckbox.cs" />
+    <Compile Include="GUI\Controls\CompUiCtrlGraph.cs" />
+    <Compile Include="GUI\Controls\CompUiCtrlTextInput.cs" />
+    <Compile Include="GUI\FontParams.cs" />
+    <Compile Include="GUI\Layouts\UiGridLayout.cs" />
+    <Compile Include="GUI\UiZIndex.cs" />
+    <Compile Include="IO\CompInputFocus.cs" />
+    <Compile Include="Lights\CompIndirectLightManager.cs" />
+    <Compile Include="Lights\CompLightHDRI.cs" />
+    <Compile Include="Materials\CompMtlBrdfLUT.cs" />
+    <Compile Include="Materials\CompMtlEquirectToCube2D.cs" />
+    <Compile Include="Materials\CompMtlCube2DHdrMipmap.cs" />
+    <Compile Include="Materials\CompMtlImageProc.cs" />
+    <Compile Include="Materials\CompMtlImgCopy.cs" />
+    <Compile Include="Materials\CompMtlImgHeatmap.cs" />
+    <Compile Include="Bakers\CompBaker.cs" />
+    <Compile Include="Bakers\CompBakerCopy.cs" />
+    <Compile Include="Bakers\CompBakerCube2DGGX.cs" />
+    <Compile Include="Bakers\CompBakerCube2DMipmaps.cs" />
+    <Compile Include="Bakers\CompBakerEquirectToCube2D.cs" />
+    <Compile Include="Materials\CompMtlPostProcess.cs" />
+    <Compile Include="Materials\CompShaderRef.cs" />
+    <Compile Include="Materials\Modules\MtlModDisplacement.cs" />
+    <Compile Include="Materials\Modules\MtlModShadowMapBiasing.cs" />
+    <Compile Include="Mesh\CompMeshGeomBuffers.cs" />
+    <Compile Include="Mesh\IMeshGeometry.cs" />
+    <Compile Include="Encodings\BGRA.cs" />
+    <Compile Include="Encodings\ColorEncoding.cs" />
+    <Compile Include="Encodings\RGBE.cs" />
+    <Compile Include="Materials\Modules\MtlModTextureCoords.cs" />
+    <Compile Include="Materials\Modules\MtlModAlphaMasking.cs" />
+    <Compile Include="Textures\AtlasLayoutQuadTree.cs" />
+    <Compile Include="EngineModule\BaseMod.cs" />
+    <Compile Include="Audio\CompAudioFxFadeIn.cs" />
+    <Compile Include="Audio\CompAudioFxDirGradient.cs" />
+    <Compile Include="Audio\CompAudioFxVolumeRnd.cs" />
+    <Compile Include="Audio\CompAudio.cs" />
+    <Compile Include="Audio\CompAudioEngine.cs" />
+    <Compile Include="Cameras\CompCamCascade.cs" />
+    <Compile Include="Transforms\CompTransformKeyMovement.cs" />
+    <Compile Include="Transforms\CompTransformMouseLook.cs" />
+    <Compile Include="Transforms\CompTransformEditorMovement.cs" />
+    <Compile Include="Cameras\CompCamIdentity.cs" />
+    <Compile Include="Cameras\CompCamOrthographic.cs" />
+    <Compile Include="Transforms\CompTransformCameraRig.cs" />
+    <Compile Include="Events\CompActionOnChange.cs" />
+    <Compile Include="Events\CompEventMouseDownInArea.cs" />
+    <Compile Include="Events\CompActionOnEvent.cs" />
+    <Compile Include="Events\CompEvent.cs" />
+    <Compile Include="Events\CompEventClickInArea.cs" />
+    <Compile Include="Events\CompEventEngineLoading.cs" />
+    <Compile Include="Events\CompEventKeyPressed.cs" />
+    <Compile Include="Events\CompEventLoadingScreenVisible.cs" />
+    <Compile Include="CompFunction.cs" />
+    <Compile Include="Events\CompEventMouseDrag.cs" />
+    <Compile Include="Events\CompEventMouseInArea.cs" />
+    <Compile Include="GUI\Controls\CompUiCtrlButton.cs" />
+    <Compile Include="Textures\CompTextureRef.cs" />
+    <Compile Include="GUI\Controls\CompUiCtrlColorPicker.cs" />
+    <Compile Include="GUI\Controls\CompUiCtrlColorSwatch.cs" />
+    <Compile Include="GUI\Windows\CompUiWndColorPicker.cs" />
+    <Compile Include="Materials\CompMtlPhysical.cs" />
+    <Compile Include="GUI\Coords\CoordContext.cs" />
+    <Compile Include="GUI\Coords\UiCoords.cs" />
+    <Compile Include="GUI\Coords\UiSize.cs" />
+    <Compile Include="GUI\Coords\UiWidth.cs" />
+    <Compile Include="GUI\Coords\UiHeight.cs" />
+    <Compile Include="GUI\Coords\UiUnit.cs" />
+    <Compile Include="GUI\Coords\UiValue.cs" />
+    <Compile Include="GUI\Controls\CompUiCtrlSlider.cs" />
+    <Compile Include="GUI\PositionOrigin.cs" />
+    <Compile Include="EngineModule\BaseModUiSettings.cs" />
+    <Compile Include="GUI\UiRenderPassCanvas.cs" />
+    <Compile Include="GUI\CompUiContainer.cs" />
+    <Compile Include="GUI\CompUiControl.cs" />
+    <Compile Include="GUI\Windows\CompUiWndDebugInfo.cs" />
+    <Compile Include="GUI\Controls\CompUiCtrlPicture.cs" />
+    <Compile Include="GUI\Controls\CompUiCtrlLabel.cs" />
+    <Compile Include="GUI\CompUiWindow.cs" />
+    <Compile Include="GUI\IUiCanvas.cs" />
+    <Compile Include="GUI\TextSpriteIndex.cs" />
+    <Compile Include="Lights\CompLightTableManager.cs" />
+    <Compile Include="GUI\CompUiLoadingScreen.cs" />
+    <Compile Include="Materials\CompMtlGBuffer.cs" />
+    <Compile Include="Mesh\CompMeshAsyncGeometry.cs" />
+    <Compile Include="CompScreenshot.cs" />
+    <Compile Include="EngineModule\BaseModShadowParams.cs" />
+    <Compile Include="Shadows\ShadowState.cs" />
+    <Compile Include="Lights\CompLightAmbient.cs" />
+    <Compile Include="Lights\CompLightDirectional.cs" />
+    <Compile Include="Lights\CompLight.cs" />
+    <Compile Include="Lights\CompLightPoint.cs" />
+    <Compile Include="Lights\CompLightSpot.cs" />
+    <Compile Include="Materials\CompMtlBasic.cs" />
+    <Compile Include="Materials\CompMtlPhong.cs" />
+    <Compile Include="Materials\CompMtlText.cs" />
+    <Compile Include="Materials\CompMtlDepthPass.cs" />
+    <Compile Include="Mesh\CompMeshGeometry.cs" />
+    <Compile Include="CompPathWalker.cs" />
+    <Compile Include="Shadows\CompShadowAtlas.cs" />
+    <Compile Include="Global\CompTaskScheduler.cs" />
+    <Compile Include="Events\CompEventTimed.cs" />
+    <Compile Include="Time\CompTimer.cs" />
+    <Compile Include="Materials\CompMtlMasking.cs" />
+    <Compile Include="Mesh\CompMesh.cs" />
+    <Compile Include="Mesh\CompMeshPicker.cs" />
+    <Compile Include="Mesh\CompMeshList.cs" />
+    <Compile Include="Cameras\CompCamPerspective.cs" />
+    <Compile Include="Time\CompTimeSeconds.cs" />
+    <Compile Include="Textures\CubeMapHelper.cs" />
+    <Compile Include="FileFormats\HdrFile.cs" />
+    <Compile Include="Materials\MaterialFactory.cs" />
+    <Compile Include="IO\Keyboard.cs" />
+    <Compile Include="IO\Mouse.cs" />
+    <Compile Include="Encodings\LogLuv32.cs" />
+    <Compile Include="Materials\MaterialDescription.cs" />
+    <Compile Include="FileFormats\ObjFile.cs" />
+    <Compile Include="Mesh\CompObjToMesh.cs" />
+    <Compile Include="Path3D.cs" />
+    <Compile Include="Primitives.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Transforms\CompTransformStack.cs" />
+    <Compile Include="CompSphericalBackground.cs" />
+    <Compile Include="Encodings\SRGB.cs" />
+    <Compile Include="Textures\RenderTargetRef.cs" />
+    <Compile Include="Textures\TextureAtlas.cs" />
+    <Compile Include="GUI\UiPositioning.cs" />
+    <Compile Include="Vertices.cs" />
+    <Compile Include="VirtualTarget.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dragonfly.Engine.Core\Dragonfly.Engine.Core.csproj">
+      <Project>{38986ff5-b666-4862-9205-0be3b631c261}</Project>
+      <Name>Dragonfly.Engine.Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Graphics.Math\Dragonfly.Graphics.Math.csproj">
+      <Project>{80a394c6-b086-4676-b997-a67275f5bbaa}</Project>
+      <Name>Dragonfly.Graphics.Math</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Graphics\Dragonfly.Graphics.csproj">
+      <Project>{f0e31e0d-53f5-440e-bf09-aac09b9ebb92}</Project>
+      <Name>Dragonfly.Graphics</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Utils.Win32\Dragonfly.Utils.Win32.vcxproj">
+      <Project>{2607c251-5e11-43b8-923f-1e4d383573be}</Project>
+      <Name>Dragonfly.Utils.Win32</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Utils\Dragonfly.Utils.csproj">
+      <Project>{5440138A-E0B3-4B32-9713-38DEF2C4FF11}</Project>
+      <Name>Dragonfly.Utils</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Libraries\AtmosphericScattering.dfx" />
+    <None Include="Shaders\Libraries\Dithering.dfx" />
+    <None Include="Shaders\Libraries\Gradients.dfx" />
+    <None Include="Shaders\Libraries\LightFilterCommon.dfx" />
+    <None Include="Shaders\Libraries\MRidgeNoise.dfx" />
+    <None Include="Shaders\Libraries\SimpleNoiseBase.dfx" />
+    <None Include="Shaders\Libraries\SimplexNoise.dfx" />
+    <None Include="Shaders\Libraries\SolidCommon.dfx" />
+    <None Include="Shaders\Libraries\SolidVertexDefaults.dfx" />
+    <None Include="Shaders\Materials\AtmosphereLightFilter.dfx" />
+    <None Include="Shaders\Materials\AtmosphereLUT.dfx" />
+    <None Include="Shaders\Modules\ModAlphaMasking.dfx" />
+    <None Include="Shaders\Libraries\AlphaBlend.dfx" />
+    <None Include="Shaders\Modules\ModAtmosphere.dfx" />
+    <None Include="Shaders\Modules\ModDisplacement.dfx" />
+    <None Include="Shaders\Materials\Graph.dfx" />
+    <None Include="Shaders\Libraries\PerlinNoise.dfx" />
+    <None Include="Shaders\Libraries\Physical.dfx" />
+    <None Include="Shaders\Materials\PostProcessPass.dfx" />
+    <None Include="Shaders\Materials\RadianceRendering.dfx" />
+    <None Include="Shaders\Libraries\ColorConversion.dfx" />
+    <None Include="Shaders\Materials\ColorPicker.dfx" />
+    <None Include="Shaders\Libraries\EnvMaps.dfx" />
+    <None Include="Shaders\Materials\GBuffer.dfx" />
+    <None Include="Shaders\Libraries\Math.dfx" />
+    <None Include="Shaders\Libraries\MatrixHelper.dfx" />
+    <None Include="Shaders\Libraries\NormalMaps.dfx" />
+    <None Include="Shaders\Materials\PhysicalMaterial.dfx" />
+    <None Include="Shaders\Libraries\Noise.dfx" />
+    <None Include="Shaders\Libraries\RayTracing.dfx" />
+    <None Include="Shaders\Libraries\Sampling.dfx" />
+    <None Include="Shaders\Libraries\ScreenSpace.dfx" />
+    <None Include="Shaders\Libraries\SDF.dfx" />
+    <None Include="Shaders\Materials\SphericalBackground.dfx" />
+    <None Include="Shaders\Materials\BasicMaterial.dfx" />
+    <None Include="Shaders\Materials\ImgProcessing.dfx" />
+    <None Include="Shaders\Libraries\LightsCommon.dfx" />
+    <None Include="Shaders\Materials\MaskingMaterial.dfx" />
+    <None Include="Shaders\Materials\PhongMaterial.dfx" />
+    <None Include="Shaders\Libraries\Layouts.dfx" />
+    <None Include="Shaders\Modules\ModExpFog.dfx" />
+    <None Include="Shaders\Modules\ModIndirectLighting.dfx" />
+    <None Include="Shaders\Modules\ModShadowMapBiasing.dfx" />
+    <None Include="Shaders\Modules\ModSSAtmosphere.dfx" />
+    <None Include="Shaders\Modules\ModTexCoordScaling.dfx" />
+    <None Include="Shaders\Materials\TextMaterial.dfx" />
+    <None Include="Shaders\Libraries\VertexBaking.dfx" />
+    <None Include="Shaders\Libraries\Volumetrics.dfx" />
+    <None Include="Shaders\Templates\TemplLitSolid.dfx" />
+    <None Include="Shaders\Templates\TemplShadowMap.dfx" />
+    <None Include="Shaders\Templates\TemplSolid.dfx" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Templates\TemplScreenColor.dfx" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Templates\TemplPhysical.dfx" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Templates\TemplDepthPrePass.dfx" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Libraries\WorldCoords.dfx" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Libraries\Depth.dfx" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Modules\ModSSFlare.dfx" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

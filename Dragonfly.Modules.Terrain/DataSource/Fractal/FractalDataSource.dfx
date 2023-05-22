@@ -1,0 +1,294 @@
+﻿shader: FractalDataSource;
+using TerrainDataSrcCommon;
+using ScreenSpace;
+using VertexBaking;
+using SimplexNoise;
+using NormalMaps;
+using Sampling;
+using TerraNoise;
+using MRidgeNoise;
+using Gradients;
+using TiledFloat3;
+
+// geometric params
+float2 gridTexelSize;
+float4 terrainUVScaleOffset;
+
+// albedo params
+texture albedoLut : NoFilter, Clamp;
+float albedoLutK;
+#define LUT_SLOPE_THR 0
+#define LUT_NOISE_TYPE_BLEND 1
+#define ANOISE_BLEND 0
+#define ANOISE_VAR1 1
+#define ANOISE_VAR2 2
+texture albedoNoiseTex : Clamp; // pre-baked albedo noises
+float4 albedoBlendDistr; // tea-noise distribution used to add noise to the sampled albedo from the LUT (pre-baked)
+float albedoBlendSharpness;
+float4 albedoVarDistr; // used for various pre-baked noises to variate among different albedo values for a give altitute
+float detailNormalMul; // normal attenuation to avoid aliasing on full zoom out
+
+// noise params
+float4 baseDistr;
+float4 baseDistrK;
+float4 baseDistrM;
+float2 noiseSeed;
+float4 detailDistr1;
+float4 peaksModulationDistr;
+float4 detailDistr2;
+float2 cliffHeightMinMax;
+float erosionPercent;
+
+// noise cache
+variant baseNoiseSrc : Distribution, Texture;
+texture baseNoiseTex : NoFilter;
+float4 baseNoiseTexOffsetSize;
+variant detailNoiseSrc : Distribution, Texture;
+texture detailNoiseTex : NoFilter;
+float4 detailNoiseTexOffsetSize;
+
+float2 GetTerrainUV(float2 tileUV)
+{
+	return tileUV * terrainUVScaleOffset.xy + terrainUVScaleOffset.zw;
+}
+
+float GetTerrainEdgeBlend(float2 tileUV)
+{
+	float2 terrainEdges = 2.0 * abs(GetTerrainUV(tileUV) - 0.5);
+	return smoothstep(0.9, 1.0, max(terrainEdges.x, terrainEdges.y));
+}
+
+void FillCountinuousTileTangents(float2 tileUV, float3 surfaceNormal, out float3 xTan, out float3 yTan)
+{
+	float edgeBlend = GetTerrainEdgeBlend(tileUV);
+	// make the tangent the same on terrain edges to avoid artifacts in planets
+	// (avoid normalizing: will produce less artifacts than getting a singularity with a divisions by small numbers)
+	yTan = lerp(yDir, float3(0.0, 1.0, 0.0), edgeBlend);
+	xTan = lerp(xDir, cross(surfaceNormal, yTan), edgeBlend); 
+}
+
+float4 BaseNoiseAt(float2 texCoords, TiledFloat3 noisePos)
+{
+#if baseNoiseSrc == Distribution
+	// sample base noise distribution
+	float4 peaksMod = MRidgeNoiseWorldDistributionDDX(noisePos.value, noisePos.tile, peaksModulationDistr, 16.0, 1.0, noiseSeed + 1.0);
+	peaksMod = GradOffset(-peaksMod, 1.0); // invert the modulation
+	float4 baseNoise = TerraNoiseWorldDistributionDDX(noisePos.value, noisePos.tile, baseDistr, baseDistrK, baseDistrM, peaksMod, noiseSeed);
+#else
+	// sample base noise from a precomputed lut
+	float4 baseNoise = (float4)1;
+	float2 texCoords01 = RoundUVTexelCenterTo01(texCoords, gridTexelSize);
+	float2 baseNoiseUV01 = texCoords01 * baseNoiseTexOffsetSize.zw + baseNoiseTexOffsetSize.xy;
+	float2 baseNoiseUV = RemapUV01ToTexelCenter(baseNoiseUV01, gridTexelSize);
+	baseNoise = SampleBilinear(baseNoiseTex, baseNoiseUV, gridTexelSize);
+#endif
+
+	return baseNoise;
+}
+
+float4 DetailNoise1At(float2 texCoords, TiledFloat3 noisePos)
+{
+#if detailNoiseSrc == Distribution
+	// sample detail noise distribution
+	float4 detailNoise = MRidgeNoiseWorldDistributionDDX(noisePos.value, noisePos.tile, detailDistr1, 64.0, 0.86, noiseSeed);
+#else
+	// sample detail noise from a precomputed lut
+	float4 detailNoise = (float4)1;
+	float2 texCoords01 = RoundUVTexelCenterTo01(texCoords, gridTexelSize);
+	float2 detailNoiseUV01 = texCoords01 * detailNoiseTexOffsetSize.zw + detailNoiseTexOffsetSize.xy;
+	float2 detailNoiseUV = RemapUV01ToTexelCenter(detailNoiseUV01, gridTexelSize);
+	detailNoise = SampleBilinear(detailNoiseTex, detailNoiseUV, gridTexelSize);
+#endif
+
+	return detailNoise;
+}
+
+// Returns the v coordinate at which to sample the albedo LUT for the specified height.
+float GetAlbedoLayerCoord(float height)
+{
+	return 0.5 + 0.5 * height / (abs(height) + albedoLutK);
+}
+
+// Returns the layer data given a LUT v coord.
+float4 GetAlbedoLayerData(float vcoord)
+{
+	return SampleBicubic(albedoLut, float2(0, vcoord), texelSize(albedoLut));
+}
+
+float4 TerrainNoiseAt(float2 texCoords, float3 surfaceNormal, TiledFloat3 noisePos)
+{
+	float4 terrainNoise = (float4) 0;
+
+	// 1- base distribution sampling
+	float4 baseNoise = BaseNoiseAt(texCoords, noisePos);
+	
+	// calc an erosion gradient from the constant, which is clamped below sea level
+	float maxDetailOceanDepth  = -TerrainNoiseAvgOceanDepth(baseDistrK, baseDistrM) * 0.1;
+	float4 erosionGradient = GradDiv(erosionPercent * GradMax(baseNoise, maxDetailOceanDepth), baseNoise);
+	
+	// add erosion-modulated base distribution to the terrain
+	terrainNoise += GradMul(baseNoise, ConstToGrad(1.0) - erosionGradient);
+	
+	// 2- detail noise 1 (height - modulated)
+	float4 detailNoise1 = DetailNoise1At(texCoords, noisePos);
+	terrainNoise += GradMul(erosionGradient, GradMul(baseNoise, detailNoise1));
+	
+	// 3- detail noise 2 (slope - modulated)
+	
+	// fetch albedo slope thr
+	float hv = GetAlbedoLayerCoord(terrainNoise.w);
+	float slopeThr = GetAlbedoLayerData(hv)[LUT_SLOPE_THR];
+
+	// sample detail noise
+	float4 detailNoise2 = SimplexNoiseWorldDistributionDDX(noisePos.value, noisePos.tile, detailDistr2, noiseSeed + 13.0); // generate the second detailing level of noise
+	detailNoise2 = GradOffset(detailNoise2, -0.5 * NoiseDistrMax(detailDistr2));
+	
+	// modulate it with the slope
+	float3 xTan, yTan;
+	FillCountinuousTileTangents(texCoords, surfaceNormal, out xTan, out yTan);
+	float4 slopeMulNoise = GradSlope(terrainNoise, xTan, yTan); // create a slope indicator noise from the previous noise layers
+	slopeMulNoise.w = smoothstep(0.5 * slopeThr, 0.25 + slopeThr, slopeMulNoise.w); // interpolate slope indicator around the albedo slope thr to make it noise loosely match albedo
+	slopeMulNoise = GradOffset((cliffHeightMinMax.y - cliffHeightMinMax.x) * slopeMulNoise, cliffHeightMinMax.x); // scale slope multiplier with the wanted cliff heights
+	float4 detailNoise2Modulated = GradMul(detailNoise2, slopeMulNoise); // modulate second detail noise with slope
+	terrainNoise += detailNoise2Modulated;
+	
+	return terrainNoise;	
+}
+
+float4 TerrainNoiseAt(float2 texCoords)
+{
+	LocalDataSrcInfo dataSrcInfo = GetLocalDataSrcInfo(texCoords);
+	return TerrainNoiseAt(texCoords, dataSrcInfo.surfaceNormal, dataSrcInfo.noisePosition);
+}
+
+float3 AlbedoAt(float2 texCoords, float3 surfaceNormal, float4 heightNoise)
+{
+	// fetch layer params and lut coords
+	float hv = GetAlbedoLayerCoord(heightNoise.w);
+	float4 layerData = GetAlbedoLayerData(hv);
+	float3 xTan, yTan;
+	FillCountinuousTileTangents(texCoords, surfaceNormal, out xTan, out yTan);
+	float slope = GradSlope(heightNoise, xTan, yTan).w;
+	float uRange = 0.5 - 1.5 * texelSize(albedoLut).x;
+	float uBase = 1.5 * texelSize(albedoLut).x + step(layerData[LUT_SLOPE_THR], slope) * (0.5 - 0.5 * texelSize(albedoLut).x);
+	float4 albedoNoise = sampleLevel0(albedoNoiseTex, texCoords);
+
+	// calc variation
+	float albedoVarNoise = lerp(albedoNoise[ANOISE_VAR1], albedoNoise[ANOISE_VAR2], layerData[LUT_NOISE_TYPE_BLEND]);
+	float albedoVar = albedoVarNoise * uRange;
+
+	// sample albedo
+	float2 albedoWeights;
+	float4x4 albedoSamples = GatherBicubic(albedoLut, float2(uBase + albedoVar, hv), texelSize(albedoLut), albedoWeights);
+	float4 albedoSmooth = Bilinear(albedoSamples, albedoWeights);
+	float4 albedoSharp = Bilinear(albedoSamples, step(albedoNoise[ANOISE_BLEND], albedoWeights));
+	float4 albedo = lerp(albedoSmooth, albedoSharp, albedoBlendSharpness);
+
+	return albedo.xyz;
+}
+
+// fragment that bake a tile normal and albedo texture
+PS PS_OUT_TERRAIN_TEX TerrainSrcTexFractal(POS4_TEX_NORM IN)
+{
+	PS_OUT_TERRAIN_TEX OUT = (PS_OUT_TERRAIN_TEX)0;
+
+	// compute terrain noise
+	LocalDataSrcInfo dataSrcInfo = GetLocalDataSrcInfo(IN.texCoords);
+	float4 noise = TerrainNoiseAt(IN.texCoords, dataSrcInfo.surfaceNormal, dataSrcInfo.noisePosition);
+
+	// normal attenuation in textures
+	noise.xyz *= detailNormalMul;
+
+	// fill normal
+	float3 tn = GradToNormalNT(noise, dataSrcInfo.surfaceNormal, xDir);
+	OUT.normal = NormalModelSpaceToMap(tn);
+
+	// fill albedo
+	OUT.albedo.xyz = AlbedoAt(IN.texCoords, dataSrcInfo.surfaceNormal, noise);
+	OUT.albedo.a = 1;
+
+	return OUT;
+}
+
+effect TerrainSrcTexFractal {VS = ScreenPass, PS = TerrainSrcTexFractal};
+
+// fragment that bake tile displacement texture
+PS PS_OUT_TERRAIN_DISPL TerrainSrcDisplFractal(POS4_TEX_NORM IN)
+{
+	PS_OUT_TERRAIN_DISPL OUT = (PS_OUT_TERRAIN_DISPL)0;
+
+	// compute terrain noise
+	float4 noise = TerrainNoiseAt(IN.texCoords);
+
+	// fill displacement
+	OUT.displacement.r = noise.w;
+
+	return OUT;
+}
+
+effect TerrainSrcDisplFractal{ VS = ScreenPass, PS = TerrainSrcDisplFractal };
+
+layout PS_OUT_TERRAIN_NOISECACHE
+{
+	float4 noiseCache : COLOR0;
+};
+
+// fragment that bake the base noise part of the terrain displacement texture
+PS PS_OUT_TERRAIN_NOISECACHE TerrainSrcBaseNoiseFractal(POS4_TEX_NORM IN)
+{
+	PS_OUT_TERRAIN_NOISECACHE OUT = (PS_OUT_TERRAIN_NOISECACHE)0;
+
+	// compute terrain noise
+	LocalDataSrcInfo dataSrcInfo = GetLocalDataSrcInfo(IN.texCoords);
+	float4 noise = BaseNoiseAt(IN.texCoords, dataSrcInfo.noisePosition);
+
+	// fill displacement
+	OUT.noiseCache = noise;
+
+	return OUT;
+}
+
+effect TerrainSrcBaseNoiseFractal{ VS = ScreenPass, PS = TerrainSrcBaseNoiseFractal };
+
+// fragment that pre-bake various noises used for terrain albedo blending
+PS RT_COLOR TerrainSrcAlbedoNoiseFractal(POS4_TEX_NORM IN)
+{
+	RT_COLOR OUT = (RT_COLOR)0;
+	LocalDataSrcInfo dataSrcInfo = GetLocalDataSrcInfo(IN.texCoords);
+
+	// blend (tea) noise
+	float4 blendNoise = NoiseWorldDistributionDDX(dataSrcInfo.noisePosition.value, dataSrcInfo.noisePosition.tile, albedoBlendDistr, noiseSeed);
+	blendNoise = GradQuintic(blendNoise); // flatten the distribution
+	OUT.color[ANOISE_BLEND] = blendNoise.w;
+
+	// brown and marble noise for albedo variation
+	float4 displNoise = NoiseWorldDistributionDDX(dataSrcInfo.noisePosition.value, dataSrcInfo.noisePosition.tile, albedoVarDistr, noiseSeed - 27.0);
+	float displAmount = 4.0 * displNoise.w * OctaveToCoordMul(-GetDistrStartOctave(albedoVarDistr));
+	OUT.color[ANOISE_VAR1] = GradQuintic(displNoise).w;	
+	float3 xTan, yTan;
+	FillCountinuousTileTangents(IN.texCoords, dataSrcInfo.surfaceNormal, out xTan, out yTan);
+	float3 marblingDir = 0.5 * (xTan + yTan);
+	float4 marbleNoise = NoiseWorldDistributionDDX(dataSrcInfo.noisePosition.value + displAmount * marblingDir, dataSrcInfo.noisePosition.tile, albedoVarDistr, noiseSeed - 27.0).w;
+	OUT.color[ANOISE_VAR2] = GradQuintic(marbleNoise).w;
+
+	return OUT;
+}
+
+effect TerrainSrcAlbedoNoiseFractal{ VS = ScreenPass, PS = TerrainSrcAlbedoNoiseFractal };
+
+// fragment that bake the first part of detail noise for the terrain displacement texture
+PS PS_OUT_TERRAIN_NOISECACHE TerrainSrcDetailNoiseFractal(POS4_TEX_NORM IN)
+{
+	PS_OUT_TERRAIN_NOISECACHE OUT = (PS_OUT_TERRAIN_NOISECACHE)0;
+
+	// compute detail terrain noise
+	LocalDataSrcInfo dataSrcInfo = GetLocalDataSrcInfo(IN.texCoords);
+	float4 noise = DetailNoise1At(IN.texCoords, dataSrcInfo.noisePosition);
+
+	// fill displacement
+	OUT.noiseCache = noise;
+
+	return OUT;
+}
+
+effect TerrainSrcDetailNoiseFractal{ VS = ScreenPass, PS = TerrainSrcDetailNoiseFractal };

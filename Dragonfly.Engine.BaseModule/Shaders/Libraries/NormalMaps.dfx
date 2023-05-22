@@ -1,0 +1,81 @@
+﻿shader: NormalMaps;
+using Core;
+using MatrixHelper;
+
+
+// Generate a matrix to transform a detail normal from a normal map to a world space normal
+// using screen space derivatives.
+// N: the vertex normal.
+// backViewVec: vector from the vertex to the eye in world space.
+// texCoords: the texture coords used to sample the detail normal.
+// USAGE: mul(detailNormal, cotangentFrame()) where detailNormal = {X, Z, Y}
+float3x3 CotangentFrame(float3 N, float3 backViewVec, float2 texCoords)
+{
+	// get edge vectors of the pixel triangle
+	float3 dp1 = ddx(backViewVec);
+	float3 dp2 = ddy(backViewVec);
+	float2 duv1 = ddx(texCoords);
+	float2 duv2 = ddy(texCoords);
+
+	// prevent artifacts if a model have no tex coords (all tex coords set to 0)
+	float coordsNotAvailable = step(dot(float2(1, 1), abs(duv1) + abs(duv2) + abs(texCoords)), 0);
+	duv1.x += coordsNotAvailable;
+	duv2.y += coordsNotAvailable;
+
+	// solve the linear system
+	float3 dp2perp = cross(dp2, N);
+	float3 dp1perp = cross(N, dp1);
+	float3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+	float3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+
+	// construct a scale-invariant frame
+	float invmax = -rsqrt(max(dot(T, T), dot(B, B)));
+	return float3x3(T * invmax, B * invmax, N);
+}
+
+// Generate a matrix to transform a normal in world space to a normal view space
+float3x3 ViewTangentFrame(float3 backViewVec)
+{
+	float3 N = normalize(backViewVec);
+	float3 T = normalize(cross(N, CAMERA_UP));
+
+	float3x3 viewTanFrame = (float3x3)0;
+	SetColumn(viewTanFrame, T, 0);
+	SetColumn(viewTanFrame, cross(N, T), 1);
+	SetColumn(viewTanFrame, N, 2);
+	return viewTanFrame;
+}
+
+// encode a normal in tangent space to a normal map color saveable to file 
+float4 NormalTanSpaceToMap(float3 tanSpaceNormal)
+{
+	return float4(tanSpaceNormal.x * 0.5 + 0.5, tanSpaceNormal.y * 0.5 + 0.5, tanSpaceNormal.z, 1.0);
+}
+
+// decode a normal map pixel to a tanget space normal. Support xyz normals, DXT5 Norm.
+float3 NormalMapToTanSpace(float4 n)
+{
+	float2 nxy = 2.0 * lerp(n.ag, n.rg, step(1.0, n.a)) - 1.0; // support for both classic normals and dxt5 norm (with x in alpha channel)
+	return float3(nxy, sqrt(1.0 - dot(nxy, nxy)));
+}
+
+// encode a model space normal to texture
+float4 NormalModelSpaceToMap(float3 modelSpaceNormal)
+{
+	return float4(modelSpaceNormal.xzy * 0.5 + 0.5, 1);
+}
+
+// decode a model space normal from texture
+float3 NormalMapToModelSpace(float4 modelMapSample)
+{
+	return min(normalize(2.0 * modelMapSample.xzy - 1), 1);
+}
+
+// decode and apply a detail normal as sampled from a normal map to a world space normal, given a tangent vector.
+float3 ApplyNormalMap(float4 normalMapSample, float3 baseNormalWS, float3 tangentWS)
+{
+	float3 bitangentWS = cross(tangentWS, baseNormalWS);
+	tangentWS = cross(baseNormalWS, bitangentWS);
+	float3 normalTS = NormalMapToTanSpace(normalMapSample);
+	return tangentWS * normalTS.x + bitangentWS * normalTS.y + baseNormalWS * normalTS.z;
+}

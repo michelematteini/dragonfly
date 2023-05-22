@@ -1,0 +1,149 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{99BCE7CF-5F05-405E-990C-A603FAF92A25}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Dragonfly.Terrain</RootNamespace>
+    <AssemblyName>Dragonfly.Modules.Terrain</AssemblyName>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;TRACING</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>
+    </DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>TRACE;DEBUG;TRACING</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Testing|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Testing\</OutputPath>
+    <DefineConstants>TRACE;TRACING</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Testing|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Testing\</OutputPath>
+    <DefineConstants>TRACE;TRACING</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="CompPlanet.cs" />
+    <Compile Include="CompPlanetUpVector.cs" />
+    <Compile Include="CompTerrainLODUpdater.cs" />
+    <Compile Include="DataSource\Flat\CompMtlFlatDataSrc.cs" />
+    <Compile Include="DataSource\Flat\CompFlatDataSource.cs" />
+    <Compile Include="DataSource\CompGPUDataSource.cs" />
+    <Compile Include="DataSource\Fractal\CompMtlFractalDataSource.cs" />
+    <Compile Include="DataSource\Fractal\CompFractalDataSource.cs" />
+    <Compile Include="DataSource\Fractal\FractalDataSourceParams.cs" />
+    <Compile Include="LOD\DistanceLOD.cs" />
+    <Compile Include="DataSource\ITerrainDataSource.cs" />
+    <Compile Include="LOD\ITerrainLODStrategy.cs" />
+    <Compile Include="MaterialFactory\CompMtlTerrainPhysical.cs" />
+    <Compile Include="MaterialFactory\ITerrainMaterial.cs" />
+    <Compile Include="MaterialFactory\ITerrainMaterialFactory.cs" />
+    <Compile Include="MaterialFactory\TerrainPhysicalMaterialFactory.cs" />
+    <Compile Include="DataSource\Common\MtlModTerrainDataSrc.cs" />
+    <Compile Include="MtlModTileCurvature.cs" />
+    <Compile Include="PlanetSeed.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="CompTerrain.cs" />
+    <Compile Include="CompTerrainCurvature.cs" />
+    <Compile Include="TerrainQuadTree.cs" />
+    <Compile Include="CompTerrainTile.cs" />
+    <Compile Include="TerrainEdgeTessellation.cs" />
+    <Compile Include="CompTerrainTessellator.cs" />
+    <Compile Include="CompTerrainTileGeom.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dragonfly.Engine.BaseModule\Dragonfly.Modules.BaseModule.csproj">
+      <Project>{D42A036B-7BF4-44A0-B48A-7CCADC85116E}</Project>
+      <Name>Dragonfly.Modules.BaseModule</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Engine.Core\Dragonfly.Engine.Core.csproj">
+      <Project>{38986FF5-B666-4862-9205-0BE3B631C261}</Project>
+      <Name>Dragonfly.Engine.Core</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Graphics.Math\Dragonfly.Graphics.Math.csproj">
+      <Project>{80A394C6-B086-4676-B997-A67275F5BBAA}</Project>
+      <Name>Dragonfly.Graphics.Math</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Graphics\Dragonfly.Graphics.csproj">
+      <Project>{F0E31E0D-53F5-440E-BF09-AAC09B9EBB92}</Project>
+      <Name>Dragonfly.Graphics</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Dragonfly.Utils\Dragonfly.Utils.csproj">
+      <Project>{5440138A-E0B3-4B32-9713-38DEF2C4FF11}</Project>
+      <Name>Dragonfly.Utils</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="DataSource\Flat\TerrainDataSrcFlat.dfx" />
+    <None Include="DataSource\Fractal\FractalDataSource.dfx" />
+    <None Include="DataSource\Fractal\TerraNoise.dfx" />
+    <None Include="MaterialFactory\TerrainPhysicalMaterial.dfx" />
+    <None Include="DataSource\Common\TerrainDataSrcCommon.dfx" />
+    <None Include="TerrainCurvatureCommon.dfx" />
+  </ItemGroup>
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>

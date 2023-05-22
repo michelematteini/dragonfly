@@ -1,0 +1,164 @@
+﻿shader: TerrainPhysicalMaterial;
+
+using Core;
+using Math;
+using LightsCommon;
+using NormalMaps;
+using EnvMaps;
+using TemplPhysical;
+using Sampling;
+using Displacement;
+using TemplDepthPrePass;
+using TemplShadowMap;
+using ShadowMapBiasing;
+using Time;
+using TerrainCurvatureCommon;
+using ModIndirectLighting;
+
+texture vistaMap; // long distance albedo in sRGB space
+texture normalMap; // surface normal detail map in tangent space
+texture detailNormalMap;
+texture detailLargeNormalMap;
+float2 detailFadingNearFar;
+float2 detailLargeFadingNearFar;
+float4 detailUvScaleOffset;
+float4 detailLargeUvScaleOffset;
+float3 detailTangent;
+
+// morphing params
+float2 vertexGridSize; // 16x16
+texture prevVistaMap;
+texture prevNormalMap;
+float2 prevVistaUVOffset;
+float4 morphTimeRange;
+float4 prevEdgeDivisors; // [-x-; -z; +x; +z] 
+float prevTessDivisor;
+
+// geometry param
+float3 tilePreOffset;
+float3 worldPreOffset;
+
+POS3_TEX_NORM GetVertexData(vertex_t IN)
+{
+	return IN;
+}
+
+void PostWorldSpaceProcessing(inout SolidVertexIntermediates data)
+{
+	// calc vertex displacement ammount
+	float2 displCoords = RemapUV01ToTexelCenter(data.texCoords, GetDisplacementTexelSize());
+	float displAmount = GetDisplacementAmmountPoint(displCoords);
+
+	// ===  displacement morphing to smooth out LoD changes
+
+	// calc moprhing percent
+	float morphAmount = 1.0 - GetTimeRangePercent(morphTimeRange);
+
+	if (morphAmount)
+	{
+		// select a sampling divisor along each direction
+		float4 isOnEdge = step(vertexGridSize.xyxy * float4(data.texCoords, 1.0 - data.texCoords), 0.5);
+		float2 edgeDivisor = float2(dot(isOnEdge.yw, prevEdgeDivisors.yw), dot(isOnEdge.xz, prevEdgeDivisors.xz)); // select a divisor for edge vertices for each uv dir
+		float2 divisor = lerp((float2)prevTessDivisor, edgeDivisor, isOnEdge.yx + isOnEdge.wz) / vertexGridSize; // use the central divisor if this vertex is not on an edge
+
+		// calc UV of the two previous samples along the quad diagonal
+		float2 puv = frac(data.texCoords / divisor);
+		float2 prevLodCoordStep = (0.5 - abs(puv - 0.5)) * divisor;
+		float2 prevTexCoords0 = data.texCoords - prevLodCoordStep;
+		float2 prevTexCoords1 = data.texCoords + prevLodCoordStep;
+
+		// calc an undersampled barycentric intepolation to get a value equal to the previous lod
+		float4 prevDisplCoords;
+		prevDisplCoords.xy = RemapUV01ToTexelCenter(prevTexCoords0, GetDisplacementTexelSize());
+		prevDisplCoords.zw = RemapUV01ToTexelCenter(prevTexCoords1, GetDisplacementTexelSize());
+		float4 prevDispl;
+		prevDispl.x = GetDisplacementAmmountPoint(prevDisplCoords.xy);
+		prevDispl.y = GetDisplacementAmmountPoint(prevDisplCoords.zy);
+		prevDispl.z = GetDisplacementAmmountPoint(prevDisplCoords.xw);
+		prevDispl.w = GetDisplacementAmmountPoint(prevDisplCoords.zw);
+		float4 b1 = float4(1.0 - puv.x, puv.x - puv.y, 0.0, puv.y); // first triangle
+		float4 b2 = float4(1.0 - puv.y, 0.0, puv.y - puv.x, puv.x); // second triangle
+		float4 bquad = lerp(b2, b1, step(puv.y, puv.x)); // quad barycentric coords
+		float prevDisplAmmount = dot(bquad, prevDispl); // barycentric intepolation of the previous samples (to match the hardware intepolation of the prev LOD geometry)
+
+		// lerp between prev displace and the current
+		displAmount = lerp(displAmount, prevDisplAmmount, morphAmount);
+	}
+
+	// apply curvature and update world normal
+#ifdef curvatureEnabled
+	TerrainCurvatureInfo curvature = SampleCurvatureLUT(data.texCoords);	
+	float3 residualOffset = TF3_Expand(TF3_Sub(curvature.offset, TF3_Make(worldPreOffset, tilePreOffset))); // diff from the pre-offset to get the residual offset to apply
+	data.worldPos.xyz += residualOffset * data.worldPos.w;	
+	data.worldNormal = curvature.normal;
+#endif
+	
+	// apply terrain displacement
+	data.worldPos.xyz += GetDisplacementVector(data.worldNormal, displAmount) * data.worldPos.w;
+}
+
+void PostScreenSpaceProcessing(inout SolidVertexIntermediates data)
+{
+}
+
+float GetPixelDepth(float4 screenPos, float2 texCoords)
+{
+	return screenPos.z / screenPos.w;
+}
+
+PhysicalMatParams GetMaterialParams(SolidPixelInputs IN, float3 v)
+{
+	PhysicalMatParams OUT = (PhysicalMatParams)0;
+	float2 vistaCoords = RemapUV01ToTexelCenter(IN.texCoords, texelSize(vistaMap)); // move coords so that baked texel centers are used	
+	
+	// normal
+	OUT.normal = NormalMapToModelSpace(sample(normalMap, vistaCoords));
+
+	// albedo
+	OUT.albedo = DecodeSRGB(sample(vistaMap, vistaCoords).rgb);
+
+	// roughness
+	OUT.roughness = 1.0;
+
+	// specular
+	OUT.specular = (float3)0.04; // default 
+
+	// morphing
+	float morphAmmount = GetTimeRangePercent(morphTimeRange) + saturate(2.0 - prevTessDivisor);
+	if (morphAmmount < 1.0)
+	{
+		float2 prevCoords = RemapUV01ToTexelCenter(0.5 * IN.texCoords + prevVistaUVOffset, texelSize(vistaMap));
+
+		// prev normal
+		float3 prevNormal = NormalMapToModelSpace(sample(prevNormalMap, prevCoords));
+		OUT.normal = lerp(prevNormal, OUT.normal, morphAmmount);
+
+		// prev albedo
+		float3 prevAlbedo = DecodeSRGB(sample(prevVistaMap, prevCoords).rgb);
+		OUT.albedo = lerp(prevAlbedo, OUT.albedo, morphAmmount);
+	}
+	
+	// detail normals
+	float viewDist = distance(CAMERA_POS, IN.worldPos);
+	if(viewDist < detailLargeFadingNearFar.y)
+	{
+		float2 detailLargeCoords = IN.texCoords * detailLargeUvScaleOffset.xy + detailLargeUvScaleOffset.zw;
+		float3 detailedNormal = ApplyNormalMap(sample(detailLargeNormalMap, detailLargeCoords), OUT.normal, detailTangent);
+		float fadeToBaseNormal = smoothstep(detailLargeFadingNearFar.x, detailLargeFadingNearFar.y, viewDist);
+		OUT.normal = lerp(detailedNormal, OUT.normal, fadeToBaseNormal);
+		
+		if (viewDist < detailFadingNearFar.y)
+		{
+			float2 detailCoords = IN.texCoords * detailUvScaleOffset.xy + detailUvScaleOffset.zw;
+			detailedNormal = ApplyNormalMap(sample(detailNormalMap, detailCoords), OUT.normal, detailTangent);
+			fadeToBaseNormal = smoothstep(detailFadingNearFar.x, detailFadingNearFar.y, viewDist);
+			OUT.normal = lerp(detailedNormal, OUT.normal, fadeToBaseNormal);
+		}
+		
+		OUT.normal = normalize(OUT.normal);
+	}
+	
+	return OUT;
+}
+
+effect TerrainPhysicalMaterial : Physical(POS3_TEX_NORM), DepthPrePass(POS3_TEX_NORM), ShadowMap(POS3_TEX_NORM);

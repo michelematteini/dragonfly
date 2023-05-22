@@ -1,0 +1,224 @@
+﻿shader: PerlinNoise;
+using Math;
+using Noise;
+
+#define PERLIN_MUL 1.65
+#define PERLIN_DDX_STEP 0.001
+
+/// <summary>
+/// Return a value sample from a 3D perlin noise function.
+/// </summary>
+/// <param name="coords">Sample location</param>
+/// <returns>A value in the [-1, 1] range.</returns>
+float PerlinNoise(float3 coords, float2 texelOffset)
+{
+    // sample 8 cube corners (4 samples since zw is xy + GetNoiseZWOffset(1))
+    float3 p000 = floor(coords);
+    float3 w = frac(coords);
+    float4 t0011 = (p000.xzxz + float4(-0.5, -0.5, 0.5, 0.5) + GetNoiseZWOffset(p000.y, texelOffset).xyxy) * texelSize(randomLut).xyxy;
+    float4 v00 = sampleLevel0(randomLut, t0011.xy);
+    float4 v10 = sampleLevel0(randomLut, t0011.zy);
+    float4 v01 = sampleLevel0(randomLut, t0011.xw);
+    float4 v11 = sampleLevel0(randomLut, t0011.zw);
+
+    // calc normals from value noise
+    float4 cx;
+    float4 sx;
+    sincos(float4(v00.x, v10.x, v01.x, v11.x) * TWO_PI, sx, cx);
+    float4 cy = 2 * float4(v00.y, v10.y, v01.y, v11.y) - 1;
+    float4 sy = sqrt(1 - cy * cy);
+    float3 n000 = float3(sy[0] * cx[0], cy[0], sy[0] * sx[0]);
+    float3 n100 = float3(sy[1] * cx[1], cy[1], sy[1] * sx[1]);
+    float3 n001 = float3(sy[2] * cx[2], cy[2], sy[2] * sx[2]);
+    float3 n101 = float3(sy[3] * cx[3], cy[3], sy[3] * sx[3]);
+    sincos(float4(v00.z, v10.z, v01.z, v11.z) * TWO_PI, sx, cx);
+    cy = 2 * float4(v00.w, v10.w, v01.w, v11.w) - 1;
+    sy = sqrt(1 - cy * cy);
+    float3 n010 = float3(sy[0] * cx[0], cy[0], sy[0] * sx[0]);
+    float3 n110 = float3(sy[1] * cx[1], cy[1], sy[1] * sx[1]);
+    float3 n011 = float3(sy[2] * cx[2], cy[2], sy[2] * sx[2]);
+    float3 n111 = float3(sy[3] * cx[3], cy[3], sy[3] * sx[3]);
+
+    // calc perlin dots
+    float3 nw = w - 1;
+    float4 dy0 = float4(
+        dot(n000, float3(w.x, w.y, w.z)),
+        dot(n100, float3(nw.x, w.y, w.z)),
+        dot(n001, float3(w.x, w.y, nw.z)),
+        dot(n101, float3(nw.x, w.y, nw.z))
+    );
+    float4 dy1 = float4(
+        dot(n010, float3(w.x, nw.y, w.z)),
+        dot(n110, float3(nw.x, nw.y, w.z)),
+        dot(n011, float3(w.x, nw.y, nw.z)),
+        dot(n111, float3(nw.x, nw.y, nw.z))
+    );
+
+    // s2 smoothstep
+    float3 s2 = w * w * w * (w * (w * 6 - 15) + 10);
+
+    // interpolate value
+    float4 dy = lerp(dy0, dy1, s2.y);
+    float2 dyz = lerp(dy.xy, dy.zw, s2.z);
+    return PERLIN_MUL * lerp(dyz.x, dyz.y, s2.x);
+}
+
+/// <summary>
+/// Sample a value and its partial derivatives from a 3D perlin noise function.
+/// </summary>
+/// <param name="coords">Sample location</param>
+/// <param name="dcoords">Sampling step, used to calculate derivatives</param>
+/// <returns>Components xyz contains partial derivatives, while w contains a value in the [-1, 1] range.</returns>
+float4 PerlinNoiseDDX(float3 coords, float3 dcoords, float2 texelOffset)
+{
+    // sample 8 cube corners (4 samples since zw is xy + GetNoiseZWOffset(1))
+    float3 p000 = floor(coords);
+    float3 pw0 = frac(coords);
+    float4 t0011 = (p000.xzxz + float4(-0.5, -0.5, 0.5, 0.5) + GetNoiseZWOffset(p000.y, texelOffset).xyxy) * texelSize(randomLut).xyxy;
+    float4 v00 = sampleLevel0(randomLut, t0011.xy);
+    float4 v10 = sampleLevel0(randomLut, t0011.zy);
+    float4 v01 = sampleLevel0(randomLut, t0011.xw);
+    float4 v11 = sampleLevel0(randomLut, t0011.zw);
+
+    // calc normals from value noise
+    float4 cx;
+    float4 sx;
+    sincos(float4(v00.x, v10.x, v01.x, v11.x) * TWO_PI, sx, cx);
+    float4 cy = 2 * float4(v00.y, v10.y, v01.y, v11.y) - 1;
+    float4 sy = sqrt(1 - cy * cy);
+    float3 n000 = float3(sy[0] * cx[0], cy[0], sy[0] * sx[0]);
+    float3 n100 = float3(sy[1] * cx[1], cy[1], sy[1] * sx[1]);
+    float3 n001 = float3(sy[2] * cx[2], cy[2], sy[2] * sx[2]);
+    float3 n101 = float3(sy[3] * cx[3], cy[3], sy[3] * sx[3]);
+    sincos(float4(v00.z, v10.z, v01.z, v11.z) * TWO_PI, sx, cx);
+    cy = 2 * float4(v00.w, v10.w, v01.w, v11.w) - 1;
+    sy = sqrt(1 - cy * cy);
+    float3 n010 = float3(sy[0] * cx[0], cy[0], sy[0] * sx[0]);
+    float3 n110 = float3(sy[1] * cx[1], cy[1], sy[1] * sx[1]);
+    float3 n011 = float3(sy[2] * cx[2], cy[2], sy[2] * sx[2]);
+    float3 n111 = float3(sy[3] * cx[3], cy[3], sy[3] * sx[3]);
+
+    // calc perlin dots
+    float3 nw0 = pw0 - 1;
+    float3 pw1 = pw0 + dcoords;
+    float3 nw1 = pw1 - 1;
+    float4 d000 = float4(dot(n000, float3(pw1.x, pw0.y, pw0.z)), dot(n000, float3(pw0.x, pw1.y, pw0.z)), dot(n000, float3(pw0.x, pw0.y, pw1.z)), dot(n000, float3(pw0.x, pw0.y, pw0.z)));
+    float4 d100 = float4(dot(n100, float3(nw1.x, pw0.y, pw0.z)), dot(n100, float3(nw0.x, pw1.y, pw0.z)), dot(n100, float3(nw0.x, pw0.y, pw1.z)), dot(n100, float3(nw0.x, pw0.y, pw0.z)));
+    float4 d001 = float4(dot(n001, float3(pw1.x, pw0.y, nw0.z)), dot(n001, float3(pw0.x, pw1.y, nw0.z)), dot(n001, float3(pw0.x, pw0.y, nw1.z)), dot(n001, float3(pw0.x, pw0.y, nw0.z)));
+    float4 d101 = float4(dot(n101, float3(nw1.x, pw0.y, nw0.z)), dot(n101, float3(nw0.x, pw1.y, nw0.z)), dot(n101, float3(nw0.x, pw0.y, nw1.z)), dot(n101, float3(nw0.x, pw0.y, nw0.z)));
+    float4 d010 = float4(dot(n010, float3(pw1.x, nw0.y, pw0.z)), dot(n010, float3(pw0.x, nw1.y, pw0.z)), dot(n010, float3(pw0.x, nw0.y, pw1.z)), dot(n010, float3(pw0.x, nw0.y, pw0.z)));
+    float4 d110 = float4(dot(n110, float3(nw1.x, nw0.y, pw0.z)), dot(n110, float3(nw0.x, nw1.y, pw0.z)), dot(n110, float3(nw0.x, nw0.y, pw1.z)), dot(n110, float3(nw0.x, nw0.y, pw0.z)));
+    float4 d011 = float4(dot(n011, float3(pw1.x, nw0.y, nw0.z)), dot(n011, float3(pw0.x, nw1.y, nw0.z)), dot(n011, float3(pw0.x, nw0.y, nw1.z)), dot(n011, float3(pw0.x, nw0.y, nw0.z)));
+    float4 d111 = float4(dot(n111, float3(nw1.x, nw0.y, nw0.z)), dot(n111, float3(nw0.x, nw1.y, nw0.z)), dot(n111, float3(nw0.x, nw0.y, nw1.z)), dot(n111, float3(nw0.x, nw0.y, nw0.z)));
+
+    // s2 smoothstep
+    float3 s20 = pw0 * pw0 * pw0 * (pw0 * (pw0 * 6 - 15) + 10);
+    float3 s21 = pw1 * pw1 * pw1 * (pw1 * (pw1 * 6 - 15) + 10);
+    float4 s2x = float4(s21.x, s20.x, s20.x, s20.x);
+    float4 s2y = float4(s20.y, s21.y, s20.y, s20.y);
+    float4 s2z = float4(s20.z, s20.z, s21.z, s20.z);
+
+    // interpolate value and derivatives
+    float4 perlin = lerp(
+        lerp(
+            lerp(d000, d100, s2x),
+            lerp(d010, d110, s2x),
+            s2y), 
+        lerp(
+            lerp(d001, d101, s2x), 
+            lerp(d011, d111, s2x),
+            s2y), 
+        s2z);
+
+    // differentiate derivatives from samples
+    perlin.xyz = (perlin.xyz - perlin.www) / dcoords;
+
+    return PERLIN_MUL * perlin;
+}
+
+/// <summary>
+/// Calculate a noise octave and derivatives at the specified frequency and amplitude.
+/// </summary>
+/// <param name="coords">Sample location</param>
+/// <param name="dcoords">Sampling step, used to calculate derivatives</param>
+/// <param name="ampliture">Maximum value (scale) of this octave.</param>
+/// <param name="frequency">Octave frequency, its multiplied to the specified coords while sampling.</param>
+/// <returns>Components xyz contains partial derivatives, while w contains a value in the [0, amplitude] range.</returns>
+float4 PerlinNoiseDDXOctave(float3 coords, float3 dcoords, float amplitude, float frequency, float2 texelOffset)
+{
+    float4 perlin = PerlinNoiseDDX(coords * frequency, dcoords, texelOffset);
+    perlin.xyz = 0.5 * perlin.xyz * frequency * amplitude;
+    perlin.w = 0.5 * (perlin.w + 1.0) * amplitude;
+    return perlin;
+}
+
+/// <summary>
+/// Calculate a noise octave with the specified frequency and amplitude.
+/// </summary>
+/// <param name="coords">Sample location</param>
+/// <param name="ampliture">Maximum value (scale) of this octave.</param>
+/// <param name="frequency">Octave frequency, its multiplied to the specified coords while sampling.</param>
+/// <returns>A value in the [0, amplitude] range.</returns>
+float PerlinNoiseOctave(float3 coords, float amplitude, float frequency, float2 texelOffset)
+{
+    float perlin = PerlinNoise(coords * frequency, texelOffset);
+    perlin = 0.5 * (perlin + 1.0) * amplitude;
+    return perlin;
+}
+
+float PerlinNoiseDistribution(float3 position, float4 distr, float2 texelOffset)
+{
+    float amplitude = GetDistrAmplitude(distr);
+    int endOctave = GetDistrEndOctave(distr);
+
+    // accumulate octaves
+    float result = 0;
+    [loop] for (int i = GetDistrStartOctave(distr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float noise = PerlinNoiseOctave(position, amplitude, freq, texelOffset + i);
+        result += noise;
+        amplitude *= GetDistrAmplMul(distr);
+    }
+
+    return result;
+}
+
+float4 PerlinNoiseDistributionDDX(float3 position, float4 distr, float2 texelOffset)
+{
+    float amplitude = GetDistrAmplitude(distr);
+    int endOctave = GetDistrEndOctave(distr);
+
+    // accumulate octaves
+    float4 result = 0;
+    [loop] for (int i = GetDistrStartOctave(distr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float4 noise = PerlinNoiseDDXOctave(position, PERLIN_DDX_STEP, amplitude, freq, texelOffset + i);
+        result += noise;
+        amplitude *= GetDistrAmplMul(distr);
+    }
+
+    return result;
+}
+
+float4 PerlinNoiseWorldDistributionDDX(float3 worldPos, int3 worldTile, float4 perlinDistr, float2 texelOffset)
+{
+    float amplitude = GetDistrAmplitude(perlinDistr);
+    int endOctave = GetDistrEndOctave(perlinDistr);
+
+    // accumulate octaves
+    float4 result = (float4)0;
+    [loop] for (int i = GetDistrStartOctave(perlinDistr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float3 worldCoords = CalcWorldCoords(worldPos, worldTile, texelSize(randomLut).x, freq);
+        float4 perlin = PerlinNoiseDDX(worldCoords, PERLIN_DDX_STEP, texelOffset + i);
+        perlin.xyz = 0.5 * perlin.xyz * freq * amplitude;
+        perlin.w = 0.5 * (perlin.w + 1.0) * amplitude;
+        result += perlin;
+        amplitude *= GetDistrAmplMul(perlinDistr);
+    }
+
+    return result;
+}

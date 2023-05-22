@@ -1,0 +1,46 @@
+﻿shader: TextMaterial;
+using Core;
+using TemplScreenColor;
+
+float2 texSpriteSizes;
+float textRenderMode;
+texture fontTexture : NoMipMaps;
+
+#define TEXT_MODE_NORMAL 0
+#define TEXT_MODE_SHARP 1
+#define TEXT_MODE_CRISP 2
+#define TEXT_MODE_NOAA 3
+
+POS3_TEX_NORM GetVertexData(vertex_t IN)
+{
+	return IN;
+}
+
+float4 GetPixelColor(POS4_TEX_NORM IN)
+{
+	float4 OUT;
+	float a = sampleLevel0(fontTexture, IN.texCoords / texSpriteSizes).r;
+	float a2 = a * a;
+
+	if (textRenderMode == TEXT_MODE_CRISP)
+	{
+		OUT.a = 3.0 * a2 - 2.0 * a * a2;
+	}
+	else if (textRenderMode == TEXT_MODE_SHARP)
+	{
+		OUT.a = a2;
+	}
+	else if (textRenderMode == TEXT_MODE_NOAA)
+	{
+		OUT.a = step(0.5, a);
+	}
+	else // if (textRenderMode = TEXT_MODE_NORMAL)
+	{
+		OUT.a = a;
+	}
+
+	OUT.rgb = IN.normal;
+	return OUT;
+}
+
+effect TextMaterial : ScreenColor(POS3_TEX_NORM);

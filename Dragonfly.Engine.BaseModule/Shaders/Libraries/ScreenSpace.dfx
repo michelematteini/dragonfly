@@ -1,0 +1,26 @@
+﻿shader: ScreenSpace;
+
+using Core;
+using Layouts;
+
+VS POS4_TEX_NORM ScreenPass(POS3_TEX_NORM IN)
+{
+	POS4_TEX_NORM OUT;
+
+	OUT.position = float4(IN.position.x, IN.position.y, IN.position.z, 1.0f);
+	OUT.position = mul(OUT.position, WORLD_MATRIX);
+	OUT.position = mul(OUT.position, CAMERA_MATRIX);
+
+#ifdef Directx9
+	OUT.position.xy -= float2(PIX_SIZE.x, -PIX_SIZE.y) * OUT.position.w; // correct half pixel rasterization offset
+#endif
+
+	OUT.texCoords = IN.texCoords;
+	OUT.normal = IN.normal;
+	return OUT;
+}
+
+float2 ClipSpaceToUV(float4 clipPos)
+{
+	return 0.5 * clipPos.xy / float2(clipPos.w, -clipPos.w) + 0.5f;
+}

@@ -1,0 +1,60 @@
+﻿shader: mytesthlsl;
+
+float4x4 projectionMatrix;
+float4x4 viewMatrix;
+float4x4 rotation;
+texture texGrass;
+
+layout VS_INPUT
+{
+	float3 position  : POSITION;
+	float3 color    : TEXCOORD0;
+	float2 texCoords : TEXCOORD1;
+};
+
+layout VS_OUTPUT
+{
+	float4 position : POSITION;
+	float3 color   : TEXCOORD1;
+	float2 texCoords : TEXCOORD0;
+};
+
+layout PS_OUT
+{
+	color color : COLOR0;
+};
+
+VS VS_OUTPUT simple( VS_INPUT IN )
+{
+	VS_OUTPUT OUT;
+
+	OUT.position = float4(IN.position.x, IN.position.y, IN.position.z, 1.0f);
+	OUT.position = mul(OUT.position, INSTANCE_MATRIX);
+	OUT.position = mul(OUT.position, rotation);
+	OUT.position = mul(OUT.position, viewMatrix);
+	OUT.position = mul(OUT.position, projectionMatrix);
+    OUT.color = IN.color;
+	OUT.texCoords = IN.texCoords;
+    return OUT;
+}
+
+PS PS_OUT simpleColor(VS_OUTPUT IN)
+{
+	PS_OUT OUT;
+	OUT.color.rgb = IN.color.rgb;
+	OUT.color.a = 1.0;
+	return OUT;
+}
+
+instanced effect SimpleColorEffect {VS = simple, PS = simpleColor};
+
+
+PS PS_OUT simpleTexColor(VS_OUTPUT IN)
+{
+	PS_OUT OUT;
+	OUT.color = sample(texGrass, IN.texCoords);
+	OUT.color.rgb *= IN.color.rgb;
+	return OUT;
+}
+
+instanced effect SimpleColorTexEffect {VS = simple, PS = simpleTexColor}; 

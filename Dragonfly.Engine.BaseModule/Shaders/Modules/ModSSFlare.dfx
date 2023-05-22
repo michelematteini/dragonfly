@@ -1,0 +1,58 @@
+﻿shader: SSFlare;
+using Sampling;
+using Math;
+
+float2 ssflareLightLoc[8]; // ss location of all the flares to be rendered
+float3 ssflareLightColor[8]; // ss rgb intensity of all the flares to be rendered
+int ssflareLightCount; // number of active light slots
+
+// aspect params
+float ssflareScatteredPercent; // percentage of light scattered to form the flare. 
+float ssflareDecay; // how fast the flare intensity decay while moving away from the light position
+float4 ssflareRaysCounts; // number of rays drawn from the light position, each component can contain a different number, these are then averaged toghether
+float ssflareRaysIntensity; // how marked the rays are 0 = not visible 1 = modulate all the light
+float ssflareRaysCentralDecay; // blend rays to the light center, higher values make the rays start closer to the light
+
+#define SSFLARE_OCCLUSION_RADIUS 2.0
+#define SSFLARE_OCCLUSION_DIV 0.0625 // cached value, must equal to (2 * SSFLARE_OCCLUSION_RADIUS)^2
+
+// Apply a lens flare effect at a given light location on the screen
+void ApplyLensFlare(float2 screenUV, float2 lightUV, float3 lightColor, texture sceneDepth, inout float4 hdrColor)
+{
+	// calc flare occlusion
+	float flareOcclusionMul  = 0;
+	float2 sampleOffset = (float2)0;
+	[unroll] for (sampleOffset.x = -SSFLARE_OCCLUSION_RADIUS; sampleOffset.x < SSFLARE_OCCLUSION_RADIUS; sampleOffset.x += 1.0)
+		[unroll] for (sampleOffset.y = -SSFLARE_OCCLUSION_RADIUS; sampleOffset.y < SSFLARE_OCCLUSION_RADIUS; sampleOffset.y += 1.0)
+		{
+			float2 sampleUV = lightUV + PIX_SIZE * sampleOffset;
+			float isOutOfViewport = saturate(dot(1.0, step(0.5, abs(sampleUV - 0.5))));
+			flareOcclusionMul += max(isOutOfViewport, sign(sampleLevel0(sceneDepth, sampleUV).r));
+		}
+	
+	flareOcclusionMul = 1.0 - flareOcclusionMul * SSFLARE_OCCLUSION_DIV;
+	
+    if (flareOcclusionMul > 0)
+	{
+		float2 ssVec = screenUV - lightUV;
+		ssVec.x *= PIX_SIZE.y / PIX_SIZE.x; // aspec ratio correction
+		ssVec += 0.0001 * (1.0 - abs(sign(ssVec))); // remove singularity with ssVec = (0, 0)
+		float d2 = dot(ssVec, ssVec);
+		float2 intensity = 1.0 / (1.0 + float2(ssflareDecay, ssflareRaysCentralDecay) * d2);
+		float angle = atan2(ssVec.y, ssVec.x);
+		float rayMix = ssflareRaysIntensity * saturate(0.999 - intensity.y);
+		float4 rays = abs(frac(angle * ssflareRaysCounts * (0.5 * ONE_OVER_PI)) - 0.5);
+		float irisMul = lerp(1.0, dot(rays * rays, 0.25), rayMix);
+    
+		hdrColor.xyz += ssflareScatteredPercent * lightColor * intensity.x * irisMul * flareOcclusionMul;
+	}
+}
+
+
+void ApplyAllFlares(float2 screenUV, texture sceneDepth, inout float4 hdrColor)
+{
+    [loop] for (int i = 0; i < ssflareLightCount; i++)
+    {
+        ApplyLensFlare(screenUV, ssflareLightLoc[i], ssflareLightColor[i], sceneDepth, inout hdrColor);    
+    }
+}

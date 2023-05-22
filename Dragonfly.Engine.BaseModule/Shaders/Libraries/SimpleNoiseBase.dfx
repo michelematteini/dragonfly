@@ -1,0 +1,57 @@
+﻿shader: SimplexNoiseBase; // base shader for simplex-lattice gradient noises
+
+using Math;
+using Noise;
+
+#define SIMPLEX_SKEW 0.333333333333333333
+#define SIMPLEX_UNSKEW 0.1666666666666666
+// Calc the closest normals and their distance vectors from the specified point in a simplex lattice
+// Code adapted from https://github.com/stegu/webgl-noise/
+// p = 3D position at which the noise value is calculated.
+void CalcSimplexLattice(float3 p, float2 texelOffset, out float3 dp0, out float3 dp1, out float3 dp2, out float3 dp3, out float3 n0, out float3 n1, out float3 n2, out float3 n3)
+{
+    // find the cell origin sampling location, by skewing the lattice to an orthogonal grid
+	float3 i0 = floor(p + dot(p, (float3) SIMPLEX_SKEW));
+    
+    // find the vector from the first simplex vertex to p
+	dp0 = p - i0 + dot(i0, (float3) SIMPLEX_UNSKEW);
+
+    // compare the magnitude of dp0 components to find in which simplex of the cell i0 the coordinate p is
+	float3 gt = step(dp0.yzx, dp0.xyz);
+	gt.z = min(gt.z, 3.0 - dot(gt, 1.0)); // force a default ordering if all 3 distances are equal
+	float3 lt = 1.0 - gt;
+
+    // calc sampling coordinate offsets from i0 for the other simplex vertices
+	float3 di1 = min(gt.xyz, lt.zxy);
+	float3 di2 = max(gt.xyz, lt.zxy);
+    // float3 di3 = (float3)1.0;
+
+    // calc the vectors from the other simplex vertices to p
+    //   dp0 = dp0 - 0.0 + 0.0 * float3(SIMPLEX_UNSKEW);
+    //   dp1 = dp0 - di1  + 1.0 * float3(SIMPLEX_UNSKEW);
+    //   dp2 = dp0 - di2  + 2.0 * float3(SIMPLEX_UNSKEW);
+    //   dp3 = dp0 - 1.0 + 3.0 * float3(SIMPLEX_UNSKEW);
+	dp1 = dp0 - di1 + (float3) SIMPLEX_UNSKEW;
+	dp2 = dp0 - di2 + (float3) SIMPLEX_SKEW; // 2.0 * SIMPLEX_UNSKEW = SIMPLEX_SKEW (only in 3d)
+	dp3 = dp0 - 0.5; // -1.0 + 3.0 * SIMPLEX_UNSKEW = -0.5
+
+    // sample noise at simplex vertices
+	float2 r0 = Noise3x2IntPoint(i0, texelOffset);
+	float2 r1 = Noise3x2IntPoint(i0 + di1, texelOffset);
+	float2 r2 = Noise3x2IntPoint(i0 + di2, texelOffset);
+	float2 r3 = Noise3x2IntPoint(i0 + 1.0, texelOffset);
+
+    // calc normals from noise
+	float4 cx;
+	float4 sx;
+	sincos(float4(r0.x, r1.x, r2.x, r3.x) * TWO_PI, sx, cx);
+	float4 cy = 2 * float4(r0.y, r1.y, r2.y, r3.y) - 1;
+	float4 sy = sqrt(1 - cy * cy);
+	float4 nx = sy * cx;
+	float4 ny = cy;
+	float4 nz = sy * sx;
+	n0 = float3(nx[0], ny[0], nz[0]);
+	n1 = float3(nx[1], ny[1], nz[1]);
+	n2 = float3(nx[2], ny[2], nz[2]);
+	n3 = float3(nx[3], ny[3], nz[3]);
+}

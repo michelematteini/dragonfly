@@ -1,0 +1,121 @@
+﻿shader: MRidgeNoise;
+using SimplexNoiseBase;
+
+#define MRIGDE_MUL 860.0
+
+// frequency correction to make mridge visually match other noises better 
+// and change its tiling frequency to a power of 2 coordinate
+#define MRIDGE_FREQ_CORRECTION 0.75 
+
+// How much the single noise gradients are bent 
+#define GRAD_BEND_PERCENT 0.8 // [0; 1] higher values create bent ridges
+#define GRAD_OFFSET 0.25
+#define GRAD_ZERO 0.30
+/// <summary>
+/// Calculate mridge noise value and partial derivatives along the 3 axes.
+/// </summary>
+/// <param name="p">3D position at which the noise value is calculated.</param>
+/// <param name="sharpness">[0; +inf] higher values create sharp peaks, lower values round them.</param>
+/// <returns>A float4 containing (ddx, ddy, ddz, noise value). The noise value is in the [-1, 1] range.</returns>
+float4 MRidgeNoiseDDX(float3 p, float sharpness, float2 texelOffset)
+{
+    float3 dp0, dp1, dp2, dp3;
+    float3 n0, n1, n2, n3;
+    CalcSimplexLattice(p, texelOffset, dp0, dp1, dp2, dp3, n0, n1, n2, n3);
+    
+    // calc gradient contribution factor m for each vertex	
+    float4 d2p = float4(dot(dp0, dp0), dot(dp1, dp1), dot(dp2, dp2), dot(dp3, dp3));
+    float4 m = max(0, 0.25 - d2p * d2p);
+    float4 m2 = m * m;
+    float4 m3 = m2 * m;
+    float4 m4 = m2 * m2;
+
+    float4 result;
+
+    // calc mridge noise value
+	float4 dotdp = float4(dot(n0, dp0), dot(n1, dp1), dot(n2, dp2), dot(n3, dp3));
+	float4 grad = dotdp + GRAD_BEND_PERCENT * (d2p -  dotdp * dotdp) - GRAD_OFFSET; // paraboloid-shaped gradient
+	float4 grad0 = saturate(sharpness * grad + 0.5);
+	float4 grad1 = clamp(grad, -0.5 / sharpness, 0.5 / sharpness);
+	float4 s1g0 = grad0 * grad0 * (3.0 - 2.0 * grad0);
+	float4 grad12 = grad1 * grad1;
+	float4 tgrad = grad * (2.0 * s1g0 - 1.0) - 3.0 * sharpness * grad12 * (0.5 - sharpness * sharpness * grad12);
+    float4 tgradInv = GRAD_ZERO - tgrad;
+	result.w = dot(m4, tgradInv);
+
+    // calc mridge noise derivatives
+    result.xyz = -16.0 * basemul(m3 * tgradInv, dp0 * d2p.x, dp1 * d2p.y, dp2 * d2p.z, dp3 * d2p.w);
+	float4 dtgrad = 2.0 * s1g0 - 1.0;
+	float3 gradDDX0 = n0 + 2.0 * GRAD_BEND_PERCENT * (dp0 - dotdp.x * n0);
+	float3 gradDDX1 = n1 + 2.0 * GRAD_BEND_PERCENT * (dp1 - dotdp.y * n1);
+	float3 gradDDX2 = n2 + 2.0 * GRAD_BEND_PERCENT * (dp2 - dotdp.z * n2);
+	float3 gradDDX3 = n3 + 2.0 * GRAD_BEND_PERCENT * (dp3 - dotdp.w * n3);
+	result.xyz += basemul(m4 * (-dtgrad), gradDDX0, gradDDX1, gradDDX2, gradDDX3);
+
+    // return normalized values
+	return MRIGDE_MUL * result;
+}
+
+/// <summary>
+/// Calculate a noise octave with the specified frequency and amplitude.
+/// </summary>
+/// <param name="coords">Sample location</param>
+/// <param name="ampliture">Maximum value (scale) of this octave.</param>
+/// <param name="frequency">Octave frequency, its multiplied to the specified coords while sampling.</param>
+/// <returns>A value in the [0, amplitude] range.</returns>
+float4 MRidgeNoiseOctaveDDX(float3 coords, float amplitude, float frequency, float sharpness, float2 texelOffset)
+{
+    float f0 = frequency * MRIDGE_FREQ_CORRECTION;
+    float4 noise = MRidgeNoiseDDX(coords * f0, sharpness, texelOffset);
+    noise.w = 0.5 * (noise.w + 1.0) * amplitude;
+    float ddxMul = 0.5 * amplitude * f0;
+    noise.xyz *= ddxMul;
+    return noise;
+}
+
+
+float4 MRidgeNoiseDistributionDDX(float3 position, float4 distr, float startSharpness, float sharpnessMul, float2 texelOffset)
+{
+    float amplitude = GetDistrAmplitude(distr);
+    int endOctave = GetDistrEndOctave(distr);
+    float sharpness = startSharpness;
+    
+    // accumulate octaves
+    float4 result = 0;
+    [loop] for (int i = GetDistrStartOctave(distr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float4 noise = MRidgeNoiseOctaveDDX(position, amplitude, freq, sharpness, texelOffset + i);
+        result += noise;
+        amplitude *= GetDistrAmplMul(distr);
+        sharpness *= sharpnessMul;
+    }
+
+    return result;
+}
+
+
+float4 MRidgeNoiseWorldDistributionDDX(float3 worldPos, int3 worldTile, float4 distr, float startSharpness, float sharpnessMul, float2 texelOffset)
+{
+    float amplitude = GetDistrAmplitude(distr);
+    int endOctave = GetDistrEndOctave(distr);
+    float sharpness = startSharpness;
+
+    // accumulate octaves
+    float4 result = (float4)0;
+    [loop] for (int i = GetDistrStartOctave(distr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float3 worldCoords = CalcWorldCoords(worldPos, worldTile, texelSize(randomLut).x * 0.25, freq);
+        float4 noise = MRidgeNoiseDDX(worldCoords * MRIDGE_FREQ_CORRECTION, sharpness, texelOffset + i);
+        float mul = 0.5 * amplitude;
+        noise.w = (noise.w + 1.0) * mul;
+        float ddxmul = mul * freq * MRIDGE_FREQ_CORRECTION;
+        noise.xyz *= ddxmul;
+        result += noise;
+        amplitude *= GetDistrAmplMul(distr);
+        sharpness *= sharpnessMul;
+    }
+
+    return result;
+}

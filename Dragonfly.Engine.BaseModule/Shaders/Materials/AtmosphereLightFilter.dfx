@@ -1,0 +1,48 @@
+﻿shader: AtmosphereLightFilter;
+using TemplSolid;
+using AtmosphericScattering;
+using ModAtmosphere;
+using Depth;
+using RayTracing;
+using SolidVertexDefaults;
+using Sampling;
+
+texture atmosphereLightColorLUT : Clamp;
+texture depthInput: NoFilter, NoMipMaps, Clamp;
+float lightColorOffset;
+
+float4 GetPixelColor(SolidPixelInputs IN)
+{
+	// get the minimum depth from the local texels to avoid artifacts on edges.
+	// (later on upscaling, will take the correct depth on closer objects, moving bleeding artifacts on the background, where these are less visible)
+	float3 uvAndMinDepth = float3(IN.screenUV, 0.0);
+	float2 uvOffset = (float2)0.0;
+	[unroll] for(uvOffset.x = -1.0; uvOffset.x <= 1.0; uvOffset.x += 1.0)
+	{
+		[unroll] for(uvOffset.y = -1.0; uvOffset.y <= 1.0; uvOffset.y += 1.0)
+		{
+			float2 sampleUV = IN.screenUV + uvOffset * texelSize(depthInput);
+			float sampleDepth = DecodeDepth16(sampleLevel0(depthInput, sampleUV).r);
+			if (sampleDepth > uvAndMinDepth.z)
+				uvAndMinDepth = float3(sampleUV, sampleDepth);
+		}
+	}
+	
+	// calc world position from depth 
+	float3 worldPos = ClipDepthToWorldPos(uvAndMinDepth.z, uvAndMinDepth.xy, CAMERA_INVERSE);
+
+	AtmosphereParams atmo = GetAtmosphere();
+	
+	// calc light color lut coordinates
+	float h, sin , sinLight;
+	AtmosphereRayToSinHeight(worldPos, (float3)0.0, atmo, out h, out sin, out sinLight);
+	float hNorm = h / (atmo.zeroDensityRadius - atmo.maxDensityRadius);
+	float2 lightColorUV = float2(AtmoLightColorSinToU(-sinLight) + lightColorOffset, hNorm);
+	
+	// sample light color
+	float3 lightColor = sampleLevel0(atmosphereLightColorLUT, lightColorUV).rgb;
+	
+	return float4(lightColor, 1.0);
+}
+
+effect AtmosphereLightFilter : Solid(POS3_TEX_NORM);

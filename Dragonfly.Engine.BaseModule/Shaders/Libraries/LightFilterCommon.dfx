@@ -1,0 +1,15 @@
+﻿// shader library that calculate a filtering factor that should be multiplied to the light color
+shader: LightFilterCommon;
+
+global texture lightFilterTex : Clamp; // a texture containing a light color multiplier
+global int filteredLightID; // the ID of the light that should be filtered with the lightFilterTex
+
+float3 GetLightColorFilter(int lightID, float2 screenUV)
+{
+	float3 filter = (float3)1.0;
+	
+	if (lightID == filteredLightID)
+		filter = sampleLevel0(lightFilterTex, screenUV).rgb;
+	
+	return filter;
+}

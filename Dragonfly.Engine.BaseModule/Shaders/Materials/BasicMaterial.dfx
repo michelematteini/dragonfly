@@ -1,0 +1,26 @@
+﻿shader: BasicMaterial;
+using TemplSolid;
+using AlphaMasking;
+using TemplDepthPrePass;
+using SolidVertexDefaults;
+
+float3 color;
+texture colorTexture;
+
+float4 GetPixelColor(SolidPixelInputs IN)
+{
+	float4 diffuse = sample(colorTexture, IN.texCoords);
+	maskPixel(diffuse.a); // alpha test
+	return float4(diffuse.rgb * color, diffuse.a);
+}
+
+float GetPixelDepth(float4 screenPos, float2 texCoords)
+{
+	// alpha test
+	float4 diffuse = sample(colorTexture, texCoords);
+	maskPixel(diffuse.a);
+
+	return screenPos.z / screenPos.w;
+}
+
+effect BasicMaterial : Solid(POS3_TEX_NORM), DepthPrePass(POS3_TEX_NORM);

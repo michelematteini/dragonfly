@@ -1,0 +1,128 @@
+﻿shader: RadianceRendering;
+using Core;
+using Layouts;
+using ColorConversion;
+using EnvMaps;
+using ScreenSpace;
+using Physical;
+using Math;
+
+texture rgbeTex: NoFilter;
+float exposureMul;
+float3x3 rotationMatrix;
+bool isInputHDR;
+float roughness;
+
+PS RT_COLOR EquirectToCube2D(POS4_TEX IN)
+{
+	RT_COLOR OUT = (RT_COLOR)0;
+	float3 v = Cube2DCoordsToViewDir(IN.texCoords, PIX_SIZE);
+	v = mul(v, rotationMatrix);
+
+	float2 equirectCoords = DirToEquirectCoords(v);
+
+	if (isInputHDR)
+	{
+		OUT.color.rgb = SampleRGBEBicubic(rgbeTex, equirectCoords, texelSize(rgbeTex));
+	}
+	else
+	{
+		OUT.color.rgb = SampleSRGBBicubic(rgbeTex, equirectCoords, texelSize(rgbeTex));
+	}
+
+	OUT.color.rgb = exposureMul * OUT.color.rgb;
+	OUT.color = EncodeRGBE(OUT.color.rgb);
+	return OUT;
+}
+
+// converts an equirect texture to a cubemap where faces are fitted in a 2d texture
+effect EquirectToCube2D {VS = ScreenPass, PS = EquirectToCube2D};
+
+PS RT_COLOR Cube2DMipMapHDRFrag(POS4_TEX_NORM IN)
+{
+	RT_COLOR OUT = (RT_COLOR)0;
+
+	float3 outCubeDir = Cube2DCoordsToEdgedViewDir(IN.texCoords, PIX_SIZE);
+	OUT.color = EncodeRGBE(sampleHDRCube2DLevel0(rgbeTex, texelSize(rgbeTex), outCubeDir));
+	return OUT;
+}
+
+// Renders a mipmap from an hdr RGBE input texture, using bilinear interpolation
+effect Cube2DMipMapHDR {VS = ScreenPass, PS = Cube2DMipMapHDRFrag};
+
+#define GGX_SAMPLE_COUNT 250
+#define GGX_LINEAR_BLUR // Uncomment for a physically accurate but noisy ggx convolution.
+
+PS RT_COLOR Cube2DMipMapHDRGGXFrag(POS4_TEX_NORM IN)
+{
+	RT_COLOR OUT = (RT_COLOR)0;
+
+	float3 n = Cube2DCoordsToEdgedViewDir(IN.texCoords, PIX_SIZE);
+	float ggxRoughness = MaterialRoughnessToGGX(roughness);
+
+	[loop] for (int i = 0; i < GGX_SAMPLE_COUNT; i++)
+	{
+		float4 sample = SampleCube2dGGX(rgbeTex, texelSize(rgbeTex), n, i, GGX_SAMPLE_COUNT, ggxRoughness);
+#ifdef GGX_LINEAR_BLUR
+		OUT.color += float4(sample.w  * sample.rgb, sample.w);
+#else
+		OUT.color += float4(sample.w / (1.0 + sample.rgb), sample.w);
+#endif // GGX_LINEAR_BLUR
+
+	}
+
+#ifdef GGX_LINEAR_BLUR
+	OUT.color = EncodeRGBE(OUT.color.rgb / OUT.color.w);
+#else
+	OUT.color = EncodeRGBE(OUT.color.w / OUT.color.rgb - 1);
+#endif // GGX_LINEAR_BLUR
+
+	return OUT;
+}
+
+// Renders a mipmap from an hdr RGBE input texture, using GGX filtering with the specified roughness value
+effect Cube2DMipMapHDR_GGX {VS = ScreenPass, PS = Cube2DMipMapHDRGGXFrag};
+
+float2 ggxBrdfSplitSum(float roughness, float n_dot_v)
+{
+	float3 n = float3(0, 1, 0);
+	float3 v = float3(sqrt(1.0f - n_dot_v * n_dot_v), n_dot_v, 0);
+	
+	float2 brdfSums = (float2)0;
+	[loop] for (int i = 0; i < GGX_SAMPLE_COUNT; i++)
+	{
+		float x = 1.0 * i / GGX_SAMPLE_COUNT;
+		float randomRot = 0; // Random2x2(float2(roughness, n_dot_v)).x;
+		float3 h = HemisphereSample(n, i, D_ggx_importance(x, roughness), randomRot);
+		float3 l = 2 * dot(v, h) * h - v;
+		float n_dot_l = max(0, dot(n, l));
+		float n_dot_h = max(0, dot(n, h));
+		float v_dot_h = max(0, dot(v, h));
+
+		if (n_dot_l > 0)
+		{
+			float splitRefl = G_schlick_backmann(roughness, n_dot_l, n_dot_v) * v_dot_h / (n_dot_h * n_dot_v);
+			float Fc = pow5(1 - v_dot_h);
+			brdfSums += splitRefl * float2(1.0 - Fc, Fc);
+		}
+	}
+
+	return brdfSums / GGX_SAMPLE_COUNT;
+}
+
+PS RT_COLOR BrdfSplitSumLUTFrag(POS4_TEX_NORM IN)
+{
+	RT_COLOR OUT = (RT_COLOR)0;
+
+	float n_dot_v = IN.texCoords.x;
+	float ggxRoughness = IN.texCoords.y * IN.texCoords.y;
+
+	OUT.color.xy = ggxBrdfSplitSum(ggxRoughness, n_dot_v);
+	OUT.color.xy = sqrt(float2(1.0 - OUT.color.x, OUT.color.y)); // just to improve precision distribution, easy to decode later
+	OUT.color = EncodeRG16(OUT.color.xy);
+	return OUT;
+}
+
+// Renders the brdf LUT to be used for physical material
+effect BrdfSplitSumLUT {VS = ScreenPass, PS = BrdfSplitSumLUTFrag};
+

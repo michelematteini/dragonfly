@@ -1,0 +1,76 @@
+﻿shader: GBuffer;
+using Core;
+using NormalMaps;
+using TemplSolid;
+using MatrixHelper;
+using AlphaMasking;
+using TemplDepthPrePass;
+using SolidVertexDefaults;
+
+float3 albedoMul;
+bool doubleSided;
+texture albedoMap;
+texture normalMap;
+texture displacementMap;
+texture roughnessMap;
+texture translucencyMap;
+variant outputType : TangentSpaceNormalMap, Albedo, Roughness, Displacement, Translucency;
+
+float4 GetPixelColor(SolidPixelInputs IN)
+{
+	float4 OUT = (float4)0;
+
+	float4 albedo = sample(albedoMap, IN.texCoords);
+	maskPixel(albedo.a); // alpha test
+	OUT.a = 1.0;
+
+#if outputType == TangentSpaceNormalMap
+	// calc normal
+	float3 backV = normalize(CAMERA_POS - IN.worldPos);
+	IN.normal = normalize(IN.normal);
+	if (doubleSided)
+		IN.normal = IN.normal * sign(dot(backV, IN.normal));
+	float3 n = NormalMapToTanSpace(sample(normalMap, IN.texCoords));
+	n = mul(n, CotangentFrame(IN.normal, backV, IN.texCoords));
+
+	// transform normal in view space
+	n = mul(n, ViewTangentFrame(backV));
+
+	// output normal
+	OUT = NormalTanSpaceToMap(n);
+
+#elif outputType == Albedo
+	OUT.rgb = albedo.rgb;
+
+#elif outputType == Roughness
+	OUT.rgb = sample(roughnessMap, IN.texCoords).rgb;
+
+#elif outputType == Displacement
+	OUT.rgb = sample(displacementMap, IN.texCoords).rgb;
+
+	// modulate displacement with world space normals
+	float3 backV = normalize(CAMERA_POS - IN.worldPos);
+	IN.normal = normalize(IN.normal);
+	if (doubleSided)
+		IN.normal = IN.normal * sign(dot(backV, IN.normal));
+	OUT.rgb = OUT.rgb * dot(backV, IN.normal);
+
+#elif outputType == Translucency
+	OUT.rgb = sample(translucencyMap, IN.texCoords).rgb;
+
+#endif
+
+	return OUT;
+}
+
+float GetPixelDepth(float4 screenPos, float2 texCoords)
+{
+	// alpha test
+	float4 diffuse = sample(albedoMap, texCoords);
+	maskPixel(diffuse.a);
+
+	return screenPos.z / screenPos.w;
+}
+
+
+effect GBuffer : Solid(POS3_TEX_NORM), DepthPrePass(POS3_TEX_NORM);

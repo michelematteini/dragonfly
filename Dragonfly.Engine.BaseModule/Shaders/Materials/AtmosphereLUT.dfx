@@ -1,0 +1,146 @@
+﻿shader: AtmosphereLUT;
+using AtmosphericScattering;
+using ScreenSpace;
+using Layouts;
+using RayTracing;
+using ModAtmosphere;
+using Sampling;
+
+texture opticalDistLut;
+texture irradianceLut;
+texture irradianceCache;
+
+// Calc ray start / end for the optical depth lut. the ray refers to an atmosphere centered in (0, 0, 0)
+void AtmospereDepthLutUvToRay(float2 uv, float maxDensityRadius, float zeroDensityRadius, out float3 rayStart, out float3 rayEnd, out float occlusion)
+{
+    // calc the ray starting point and direction corresponding the specified UV coords of the LUT
+	float hrange = zeroDensityRadius - maxDensityRadius;
+	float h = AtmoHeightUDecode(uv.x, hrange);
+	rayStart = float3(0.0, h + maxDensityRadius, 0.0);
+	float sinRayAngle = 2.0 * uv.y - 1.0;
+	float3 rayDir = float3(0.0, sinRayAngle, sqrt(1.0 - sinRayAngle * sinRayAngle));
+    
+    // check if the ray is occluded by the planet surface...
+	float rayMinSurfaceHeight = RayPointDistance(rayStart, rayDir, (float3)0.0) - maxDensityRadius;
+	occlusion = rayMinSurfaceHeight / maxDensityRadius; // pre-normalize with the maxDensityRadius
+	
+    // calc ray start-end points
+	float3 i2;
+	LineSphereIntersection(rayStart, rayDir, (float3)0.0, zeroDensityRadius, out i2, out rayEnd);
+}
+
+PS RT_FLOAT2 AtmosphereDepthLUT(POS4_TEX_NORM IN)
+{
+	RT_FLOAT2 OUT = (RT_FLOAT2)0;
+	AtmosphereParams atmo = GetAtmosphere();
+	float3 rayStart, rayEnd;
+	AtmospereDepthLutUvToRay(IN.texCoords, atmo.maxDensityRadius, atmo.zeroDensityRadius, out rayStart, out rayEnd, out OUT.color.g);
+	OUT.color.r = RadialExpFogVolumeDistance32(rayStart, rayEnd, (float3)0.0, atmo.maxDensityRadius, atmo.heightDensityCoeff);
+	return OUT;
+}
+
+effect AtmosphereDepthLUT { VS = ScreenPass, PS = AtmosphereDepthLUT };
+
+PS RT_COLOR AtmosphereLightColorLUT(POS4_TEX_NORM IN)
+{
+	RT_COLOR OUT = (RT_COLOR)0;
+	AtmosphereParams atmo = GetAtmosphere();
+
+	// override light dir with a dimension of this lut
+	float sinLightDir = AtmoLightColorUToSin(IN.texCoords.x);
+	atmo.lightDir = float3(0.0, sinLightDir, sqrt(1.0 - sinLightDir * sinLightDir));
+
+	// precalc ray start position
+	float hrange = atmo.zeroDensityRadius - atmo.maxDensityRadius;
+	float3 rayStart = float3(0.0, IN.texCoords.y * hrange + atmo.maxDensityRadius, 0.0) + atmo.location;
+
+	// trace filtered light color
+	OUT.color.rgb = TraceAtmosphericLightColor(rayStart, atmo, opticalDistLut);
+
+	return OUT;
+}
+
+effect AtmosphereLightColorLUT { VS = ScreenPass, PS = AtmosphereLightColorLUT };
+
+#define ATMO_IRRADIANCE_SAMPLE_COUNT 128
+
+PS RT_COLOR AtmosphereIrradianceLUTCache(POS4_TEX_NORM IN)
+{
+	RT_COLOR OUT = (RT_COLOR)0;
+	AtmosphereParams atmo = GetAtmosphere();
+	atmo.location = (float3)0.0;
+	atmo.mieScatteringConst = 0.0; // remove mie since it adds too much noise to irradiance samples
+
+	// calc the current lut index (viewport is split in 3 separate luts
+	float expYCoord = ATMO_IRRADIANCE_SPLITS * IN.texCoords.y;
+	float localYCoord = frac(expYCoord);
+	int lutIndex = (int)expYCoord;
+
+	// override light dir with a dimension of this lut
+	float sinLightDir = AtmoIrradianceUToSin(IN.texCoords.x);
+	atmo.lightDir = float3(0.0, sinLightDir, sqrt(1.0 - sinLightDir * sinLightDir));
+
+	// precalc ray start position
+	float hrange = atmo.zeroDensityRadius - atmo.maxDensityRadius;
+	float3 rayStart = float3(0.0, localYCoord * hrange + atmo.maxDensityRadius, 0.0);
+	float3 rayMainDir = float3(0.0, 1.0, 0.0);
+
+	// precalc sample range
+	int startSample = ATMO_IRRADIANCE_SAMPLE_COUNT * lutIndex;
+	int endSample = startSample + ATMO_IRRADIANCE_SAMPLE_COUNT;
+	int	totalSamples = ATMO_IRRADIANCE_SPLITS * ATMO_IRRADIANCE_SAMPLE_COUNT;
+	// accumulate irradiance sampling in all direction over the upper view hemisphere
+	float3 atmoIrradiance = (float3)0.0;
+	[loop] for (int i = startSample; i < endSample; i++)
+	{	
+		float3 rayDir = SphereUniformSample(rayMainDir, i, totalSamples);
+
+		// calc ray end point
+		float3 atmoStart, atmoEnd;
+		LineSphereIntersection(rayStart, rayDir, (float3)0.0, atmo.zeroDensityRadius, out atmoStart, out atmoEnd); // intersect with atmosphere
+		float3 rayEnd = atmoEnd;
+		float3 surfaceStart, surfaceEnd;
+		if (RaySphereIntersection(rayStart, rayDir, (float3)0.0, atmo.maxDensityRadius, out surfaceStart, out surfaceEnd))
+		{
+			// stops at the surface
+			rayEnd = surfaceStart;
+		}
+
+		// accumulate irradiance
+		atmoIrradiance += TraceAtmosphericScattering(rayStart, rayEnd, atmo, opticalDistLut, irradianceLut);
+	}
+
+	OUT.color.rgb = atmoIrradiance / ATMO_IRRADIANCE_SAMPLE_COUNT;
+	return OUT;
+}
+
+effect AtmosphereIrradianceLUTCache { VS = ScreenPass, PS = AtmosphereIrradianceLUTCache };
+
+
+PS RT_COLOR AtmosphereIrradianceLUT(POS4_TEX_NORM IN)
+{
+	RT_COLOR OUT = (RT_COLOR)0;
+
+	// precalc coords quadrant mappings between irradiance cache and lut
+	float exLutY = (1.0 + ATMO_IRRADIANCE_SPLITS) * IN.texCoords.y;
+	float localLutY = frac(exLutY);
+	int lutIndex = (int)exLutY;
+	float2 cacheUV = float2(IN.texCoords.x, localLutY / ATMO_IRRADIANCE_SPLITS);
+	float2 cacheUVOffset = float2(0.0, 1.0 / ATMO_IRRADIANCE_SPLITS);
+
+	if (lutIndex == 0)
+	{
+		// precalculated total irradiance by summing all bands
+		[unroll] for(int i = 0; i < ATMO_IRRADIANCE_SPLITS; i++)
+			OUT.color.rgb += sampleLevel0(irradianceCache, cacheUV + i * cacheUVOffset).rgb;
+	}
+	else
+	{
+		// irradiance lut
+		OUT.color.rgb = sampleLevel0(irradianceCache, cacheUV + (lutIndex - 1) * cacheUVOffset).rgb;
+	}
+	
+	return OUT;
+}
+
+effect AtmosphereIrradianceLUT { VS = ScreenPass, PS = AtmosphereIrradianceLUT };

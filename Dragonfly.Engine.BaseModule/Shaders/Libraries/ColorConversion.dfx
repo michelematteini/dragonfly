@@ -1,0 +1,153 @@
+﻿shader: ColorConversion;
+
+
+// RGB conversions from and to HSV and HSL
+// Copyright © 2014 Inigo Quilez
+const float eps = 0.0000001;
+
+/// <summary>
+/// HSV to RGB Color
+/// </summary>
+float3 hsv2rgb(float3 c)
+{
+    float3 rgb = saturate(abs(fmod(c.x * 6.0 + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0);
+    return c.z * lerp((float3)1.0, rgb, c.y);
+}
+
+/// <summary>
+/// HSL to RGB Color
+/// </summary>
+float3 hsl2rgb(float3 c)
+{
+    float3 rgb = saturate(abs(fmod(c.x * 6.0 + float3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0);
+    return c.z + c.y * (rgb - 0.5) * (1.0 - abs(2.0 * c.z - 1.0));
+}
+
+/// <summary>
+/// RGB to HSV Color
+/// </summary>
+float3 rgb2hsv(float3 c)
+{
+    float4 k = float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+    float4 p = lerp(float4(c.zy, k.wz), float4(c.yz, k.xy), (c.z < c.y) ? 1.0 : 0.0);
+    float4 q = lerp(float4(p.xyw, c.x), float4(c.x, p.yzx), (p.x < c.x) ? 1.0 : 0.0);
+    float d = q.x - min(q.w, q.y);
+    return float3(abs(q.z + (q.w - q.y) / (6.0 * d + eps)), d / (q.x + eps), q.x);
+}
+
+/// <summary>
+/// RGB to HSL Color
+/// </summary>
+float3 rgb2hsl(float3 col)
+{
+    float minc = min(col.r, min(col.g, col.b));
+    float maxc = max(col.r, max(col.g, col.b));
+    float3  mask = step(col.grr, col.rgb) * step(col.bbg, col.rgb);
+	mask *= 1.0 - mask.gbr;
+    float3 h = mask * (float3(0.0, 2.0, 4.0) + (col.gbr - col.brg) / (maxc - minc + eps)) / 6.0;
+    return float3(frac(1.0 + h.x + h.y + h.z), (maxc - minc) / (1.0 - abs(minc + maxc - 1.0) + eps), (minc + maxc) * 0.5); // H, S, L
+}
+
+/// <summary>
+/// Linear RGB to sRGB
+/// </summary>
+float3 EncodeSRGB(float3 color)
+{
+    return pow(abs(color), 0.454545);
+}
+
+/// <summary>
+/// sRGB to Linear RGB
+/// </summary>
+float3 DecodeSRGB(float3 color)
+{
+    return pow(abs(color), 2.2);
+}
+
+void DecodeSRGBSamples(inout float4x4 samples)
+{
+    samples[0].rgb = DecodeSRGB(samples[0].rgb);
+    samples[1].rgb = DecodeSRGB(samples[1].rgb);
+    samples[2].rgb = DecodeSRGB(samples[2].rgb);
+    samples[3].rgb = DecodeSRGB(samples[3].rgb);
+}
+
+// === LogLuv encoding: 
+// see https://realtimecollisiondetection.net/blog/?p=15 
+// see https://www.gamedev.net/forums/topic.asp?topic_id=500219
+
+// a matrix used during logluv encoding
+const float3x3 rgbToLuvMat = float3x3(
+    0.2209, 0.3390, 0.4184,
+    0.1138, 0.6780, 0.7319,
+    0.0102, 0.1130, 0.2969);
+
+/// <summary>
+/// Linear RGB to logLuV
+/// </summary>
+float4 EncodeLogLuv(float3 vRGB) {
+    float4 vResult;
+    float3 Xp_Y_XYZp = mul(vRGB, rgbToLuvMat);
+    Xp_Y_XYZp = max(Xp_Y_XYZp, float3(0.000001, 0.000001, 0.000001));
+    vResult.xy = Xp_Y_XYZp.xy / Xp_Y_XYZp.z;
+    float Le = 2 * log2(Xp_Y_XYZp.y) + 127;
+    vResult.w = frac(Le);
+    vResult.z = (Le - (floor(vResult.w * 255.0f)) / 255.0f) / 255.0f;
+    return vResult;
+}
+
+// a matrix used during logluv decoding
+const float3x3 luvToRgbMat = float3x3(
+    6.0014, -2.7008, -1.7996,
+    -1.3320, 3.1029, -5.7721,
+    0.3008, -1.0882, 5.6268);
+
+/// <summary>
+/// logLuV to linear RGB
+/// </summary>
+float3 DecodeLogLuv(float4 vLogLuv) {
+    float Le = vLogLuv.z * 255 + vLogLuv.w;
+    float3 Xp_Y_XYZp;
+    Xp_Y_XYZp.y = exp2((Le - 127) / 2);
+    Xp_Y_XYZp.z = Xp_Y_XYZp.y / vLogLuv.y;
+    Xp_Y_XYZp.x = vLogLuv.x * Xp_Y_XYZp.z;
+    float3 vRGB = mul(Xp_Y_XYZp, luvToRgbMat);
+    return max(vRGB, 0);
+}
+
+/// <summary>
+/// Linear RGB to RGBE
+/// </summary>
+float4 EncodeRGBE(float3 color)
+{
+    float exp = ceil(log2(max(color.r, max(color.g, color.b))));
+    exp = min(exp, 254); // exp = 255 (a = 1.0f) is reserved to discern rgbe values from rgb
+    return float4(color.bgr * exp2(-exp), (exp + 127) / 255);
+}
+
+/// <summary>
+/// RGBE to linear RGB
+/// </summary>
+float3 DecodeRGBE(float4 rgbe)
+{
+    return rgbe.bgr * exp2(rgbe.a * 255 - 127);
+}
+
+void DecodeRGBESamples(inout float4x4 samples)
+{
+    samples[0].rgb = DecodeRGBE(samples[0]);
+    samples[1].rgb = DecodeRGBE(samples[1]);
+    samples[2].rgb = DecodeRGBE(samples[2]);
+    samples[3].rgb = DecodeRGBE(samples[3]);
+}
+
+float4 EncodeRG16(float2 rg)
+{ 
+    rg *= 255.0;
+    return float4(floor(rg) / 255.0, frac(rg));
+}
+
+float2 DecodeRG16(float4 rg16)
+{
+    return rg16.rg + rg16.ba / 255.0;
+}

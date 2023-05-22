@@ -1,0 +1,21 @@
+﻿shader: PreciseFloat;
+
+float PF_ToFloat(float2 preciseValue)
+{
+	return preciseValue.x + preciseValue.y;
+}
+
+float2 PF_Add(float2 preciseValue1, float2 preciseValue2)
+{
+	return preciseValue1 + preciseValue2;
+}
+
+float2 PF_Sub(float2 preciseValue1, float2 preciseValue2)
+{
+	return preciseValue1 - preciseValue2;
+}
+
+float2 PF_Mul(float2 preciseValue, float mul)
+{
+	return preciseValue * mul;
+}

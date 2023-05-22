@@ -1,0 +1,79 @@
+﻿shader: PhongMaterial;
+using Core;
+using NormalMaps;
+using TemplLitSolid;
+using AlphaMasking;
+using TemplDepthPrePass;
+using TemplShadowMap;
+using ShadowMapBiasing;
+using SolidVertexDefaults;
+
+float3 diffuseColor;
+float3 totalAmbient;
+float specMul;
+float specPower;
+bool doubleSided;
+texture diffuseTexture;
+texture normalTexture;
+
+struct PhongShadingParams
+{
+	float3 diffuse;
+	float3 v;
+	float3 n;
+};
+
+PhongShadingParams CalcShadingParams<PhongShadingParams>(SolidPixelInputs IN)
+{
+	ShadingParams OUT = (ShadingParams)0;
+	float4 diffuse = sample(diffuseTexture, IN.texCoords);
+	maskPixel(diffuse.a); // alpha test
+
+	// diffuse color
+	OUT.diffuse = DecodeSRGB(diffuse.rgb * diffuseColor);
+
+	// view vector 
+	OUT.v = normalize(CAMERA_POS - IN.worldPos);
+
+	// calc normal
+	IN.normal = normalize(IN.normal);
+	if (doubleSided)
+		IN.normal = IN.normal * sign(dot(CAMERA_POS - IN.worldPos, IN.normal));
+	OUT.n = NormalMapToTanSpace(sample(normalTexture, IN.texCoords));
+	OUT.n = mul(OUT.n, CotangentFrame(IN.normal, OUT.v, IN.texCoords));
+
+	return OUT;
+}
+
+float3 CalcLightContribution<PhongShadingParams>(float3 l, float3 lightIntensity, PhongShadingParams IN)
+{
+	float3 diffuse = IN.diffuse * saturate(dot(IN.n, l));
+
+	// add specular color
+	float3 r = normalize(reflect(-l, IN.n));
+	float3 specular = pow(saturate(dot(r, IN.v)), specPower) * specMul * saturate(1 - dot(IN.n, IN.v));
+
+	return (diffuse + specular) * lightIntensity;
+}
+
+float3 CalcAdditionalContributions<PhongShadingParams>(PhongShadingParams IN)
+{
+	// ambient light
+	return IN.diffuse * totalAmbient;
+}
+
+float3 GetNormal<PhongShadingParams>(PhongShadingParams IN)
+{
+	return IN.n;
+}
+
+float GetPixelDepth(float4 screenPos, float2 texCoords)
+{
+	// alpha test
+	float4 diffuse = sample(diffuseTexture, texCoords);
+	maskPixel(diffuse.a);
+
+	return screenPos.z / screenPos.w;
+}
+
+effect PhongMaterial : LitSolid(POS3_TEX_NORM), DepthPrePass(POS3_TEX_NORM), ShadowMap(POS3_TEX_NORM);

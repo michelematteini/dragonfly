@@ -1,0 +1,27 @@
+﻿shader: VertexBaking;
+
+using Core;
+using Layouts;
+
+/// <summary>
+/// Encode the generated vertex to a COLOR struct that should be returned from the pixel shader during vertex baking. 
+/// </summary>
+RT_FLOAT4 OutputVertex(POS3_TEX_NORM vertexData, float2 texCoords)
+{
+	// check which slot are we actually writing (a vertex is encoded in two pixels)
+	float slot = step(0.5, frac(0.5 * texCoords.x / PIX_SIZE.x));
+	RT_FLOAT4 result;
+	result.color = lerp(float4(vertexData.position, vertexData.texCoords.x), float4(vertexData.texCoords.y, vertexData.normal), slot);
+	return result;
+}
+
+/// <summary>
+/// Get the vertex UV in the baked vertex grid.
+/// </summary>
+/// <param name="texCoords">The pixel shader texture coords</param>
+float2 GetVertexUV(float2 texCoords)
+{
+	float evenXOffset = PIX_SIZE.x * (0.5 - step(0.5, frac(0.5 * texCoords.x / PIX_SIZE.x)));
+	return (float2(texCoords.x + evenXOffset, texCoords.y) - PIX_SIZE.x) / (1 - PIX_SIZE.y);
+}
+

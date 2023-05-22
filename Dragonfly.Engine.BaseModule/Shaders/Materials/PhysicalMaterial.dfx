@@ -1,0 +1,92 @@
+﻿shader: PhysicalMaterial;
+
+using Core;
+using Math;
+using LightsCommon;
+using NormalMaps;
+using EnvMaps;
+using TemplPhysical;
+using Sampling;
+using Displacement;
+using TexCoordScaling;
+using AlphaMasking;
+using TemplDepthPrePass;
+using TemplShadowMap;
+using ShadowMapBiasing;
+
+bool doubleSided; // if true, the normal orientations are flipped for back-faces 
+float3 albedoMul; // albedo multiplier in linear space
+texture albedoMap; // albedo map in sRGB space
+float roughMul; // roughness multiplier
+texture roughMap; // roughness map (grayscale) 
+texture normalMap; // surface normal detail map in tangent space
+float3 specular; // specular color (Fo) in linear space
+texture specularMap; // specular map in sRGB space
+texture radianceMap : NoFilter; // radiance map containing prefieltered reflections and indirect diffuse term
+
+POS3_TEX_NORM GetVertexData(vertex_t IN)
+{
+	IN.texCoords = TransformTexCoords(IN.texCoords); // apply coords scaling
+	IN.position = DisplaceVertex(IN.position, IN.normal, IN.texCoords); // vertex displacement
+	return IN;
+}
+
+void PostWorldSpaceProcessing(inout SolidVertexIntermediates data)
+{
+
+}
+
+void PostScreenSpaceProcessing(inout SolidVertexIntermediates data) 
+{
+
+}
+
+PhysicalMatParams GetMaterialParams(SolidPixelInputs IN, float3 v)
+{
+	PhysicalMatParams OUT = (PhysicalMatParams)0;
+	
+	// apply detailing normal map
+	IN.normal = normalize(IN.normal);
+	float3 n = NormalMapToTanSpace(sample(normalMap, IN.texCoords));
+	n = mul(n, CotangentFrame(IN.normal, v, IN.texCoords));
+
+	// make normal face the camera if double-sided
+	if (doubleSided)
+		n = n * sign(dot(CAMERA_POS - IN.worldPos, n));
+
+	OUT.normal = normalize(n);
+
+	// prepare a linear albedo value
+	float4 albedo = sample(albedoMap, IN.texCoords);
+	maskPixel(albedo.a); // alpha test
+
+	OUT.albedo = DecodeSRGB(albedo.rgb) * albedoMul;
+
+	// calc roughness
+	OUT.roughness = roughMul * sample(roughMap, IN.texCoords).r;
+
+	OUT.specular = specular; // TODO: take specular map into account
+
+	return OUT;
+}
+
+float3 GetRadiance(PhysicalShadingParams IN)
+{
+	return sampleHDRCube2D(radianceMap, texelSize(radianceMap), IN.m.normal, MaterialRoughnessToMipmap(IN.m.roughness));
+}
+
+float3 GetIrradiance(PhysicalShadingParams IN)
+{
+	return sampleHDRCube2D(radianceMap, texelSize(radianceMap), IN.m.normal, GGX_MAX_MIPMAP);
+}
+
+float GetPixelDepth(float4 screenPos, float2 texCoords)
+{
+	// alpha test
+	float4 albedo = sample(albedoMap, texCoords);
+	maskPixel(albedo.a); // alpha test
+
+	return screenPos.z / screenPos.w;
+}
+
+effect PhysicalMaterial : Physical(POS3_TEX_NORM), DepthPrePass(POS3_TEX_NORM), ShadowMap(POS3_TEX_NORM);

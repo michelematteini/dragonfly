@@ -1,0 +1,149 @@
+﻿shader: Volumetrics;
+using Math;
+
+/// <summary>
+/// Returns the fog optical distance in a volume where the density decreases exponentially along the specified direction.
+/// </summary>
+/// <param name="from">Start point for the volume integration.</param>
+/// <param name="to">End point for the volume integration.</param>
+/// <param name="gradientDir">Direction along which the fog density decreases.</param>
+/// <param name="gradientInnerRadius">Distance along the gradient direction at which the maximum ammount of fog is shown.</param>
+/// <param name="expCoeff">Density coeffient for the exponential gradient.</param>
+/// <returns></returns>
+float ExpFogVolumeDistance(float3 from, float3 to, float3 gradientDir, float gradientInnerRadius, float expCoeff)
+{
+	float h1 = dot(from, gradientDir) - gradientInnerRadius;
+	float h2 = dot(to, gradientDir) - gradientInnerRadius;
+	float dh = h2 - h1;
+	float d = distance(from, to);
+	float fogDist;
+	if (dh == 0)
+	{
+		fogDist = d * exp(-expCoeff * h1); // removable singularity
+	}
+	else
+	{
+		fogDist = d / (expCoeff * dh) * (exp(-expCoeff * h1) - exp(-expCoeff * h2));
+	}
+
+	return fogDist;
+}
+
+/// <summary>
+/// Apply an exponential fog to the given color.
+/// </summary>
+float3 ExpFog(float3 color, float3 fogColor, float distance, float expCoeff)
+{
+	return lerp(fogColor, color, exp(-expCoeff * distance));
+}
+
+/// <summary>
+/// Returns the fog optical distance in a volume where the density decreases exponentially along a riadial gradient with center at the specified position.
+/// This is a linear approximation with 2 samples.
+/// </summary>
+float RadialExpFogVolumeDistance(float3 from, float3 to, float3 gradientCenter, float gradientInnerRadius, float expCoeff)
+{
+	float h1 = distance(from, gradientCenter) - gradientInnerRadius;
+	float h2 = distance(to, gradientCenter) - gradientInnerRadius;
+	float dh = h2 - h1;
+	float d = distance(from, to);
+	float fogDist;
+	if (dh == 0)
+	{
+		fogDist = d * exp(-expCoeff * h1); // removable singularity
+	}
+	else
+	{
+		fogDist = d / (expCoeff * dh) * (exp(-expCoeff * h1) - exp(-expCoeff * h2));
+	}
+
+	return fogDist;
+}
+
+/// <summary>
+/// Returns the fog optical distance in a volume where the density decreases exponentially along a riadial gradient with center at the specified position.
+/// This is a linear approximation with 4 samples.
+/// </summary>
+float RadialExpFogVolumeDistance4(float3 from, float3 to, float3 gradientCenter, float gradientInnerRadius, float expCoeff)
+{
+	float3 dp = (to - from) * 0.33333;
+	float d = length(dp);
+
+	// calc 4 sample locations
+	float3 p0 = from;
+	float3 p1 = p0 + dp;
+	float3 p2 = p1 + dp;
+	float3 p3 = to;
+
+	// calc sample heights
+	float3 pc0 = p0 - gradientCenter;
+	float3 pc1 = p1 - gradientCenter;
+	float3 pc2 = p2 - gradientCenter;
+	float3 pc3 = p3 - gradientCenter;
+	float4 h2 = float4(dot(pc0, pc0), dot(pc1, pc1), dot(pc2, pc2), dot(pc3, pc3));
+	float4 h = sqrt(h2) - gradientInnerRadius;
+	h = max(0.0, h); // density below gradient 0 is fixed (or it would diverge creating artifacts);
+	
+	// calc optical distance integral (for all the 3 segments between the samples)
+	float3 dh = h.yzw - h.xyz;
+	float4 exph = exp(-expCoeff * h);
+	float3 fogDist0 = d * exph.xyz; // integral with removed singularity when dh == 0
+	float3 zeroDh = step(abs(dh), 0.0);
+	float3 safeDh = dh + zeroDh * EPS;
+	float3 fogDist = d / (expCoeff * safeDh) * (exph.xyz - exph.yzw); // normal integral, 
+	fogDist = fogDist * (1.0 - zeroDh) + fogDist0 * zeroDh; // replace integral singularity where dh == 0
+	
+	// return their sum
+	return dot(fogDist, 1.0);
+}
+
+float3 GetRadialExpImportanceSplit(float3 from, float3 to, float3 gradientCenter)
+{
+	// calc gradient point closest to the center
+	float3 dp = to - from;
+	float dp2 = dot(dp, dp);
+	float closestPerc = dot(dp, gradientCenter - from) / dp2;
+	closestPerc = clamp(closestPerc, 0.001, 0.999); // if the closest is outside the range, sample closer to the side near the center
+	return closestPerc * dp + from;
+}
+
+/// <summary>
+/// Returns the fog optical distance in a volume where the density decreases exponentially along a riadial gradient with center at the specified position.
+/// This is a linear approximation with 8 samples.
+/// </summary>
+float RadialExpFogVolumeDistance8(float3 from, float3 to, float3 gradientCenter, float gradientInnerRadius, float expCoeff)
+{
+	float3 closest = GetRadialExpImportanceSplit(from, to, gradientCenter);	
+	return RadialExpFogVolumeDistance4(from, closest, gradientCenter, gradientInnerRadius, expCoeff) + RadialExpFogVolumeDistance4(closest, to, gradientCenter, gradientInnerRadius, expCoeff);
+}
+
+/// <summary>
+/// Returns the fog optical distance in a volume where the density decreases exponentially along a riadial gradient with center at the specified position.
+/// This is a linear approximation with 32 samples.
+/// </summary>
+float RadialExpFogVolumeDistance32(float3 from, float3 to, float3 gradientCenter, float gradientInnerRadius, float expCoeff)
+{
+	float3 closest = GetRadialExpImportanceSplit(from, to, gradientCenter);	
+	
+	float3 fromClosestStep = 0.25 * (closest - from);
+	float3 closestToStep = 0.25 * (to - closest);
+	
+	float d = 0;
+	float3 s1 = from + fromClosestStep;
+	d += RadialExpFogVolumeDistance4(from, s1, gradientCenter, gradientInnerRadius, expCoeff);
+	float3 s2 = s1 + fromClosestStep;
+	d += RadialExpFogVolumeDistance4(s1, s2, gradientCenter, gradientInnerRadius, expCoeff);
+	float3 s3 = s2 + fromClosestStep;
+	d += RadialExpFogVolumeDistance4(s2, s3, gradientCenter, gradientInnerRadius, expCoeff);
+	d += RadialExpFogVolumeDistance4(s3, closest, gradientCenter, gradientInnerRadius, expCoeff);
+	s1 = closest + closestToStep;
+	d += RadialExpFogVolumeDistance4(closest, s1, gradientCenter, gradientInnerRadius, expCoeff);
+	s2 = s1 + closestToStep;
+	d += RadialExpFogVolumeDistance4(s1, s2, gradientCenter, gradientInnerRadius, expCoeff);
+	s3 = s2 + closestToStep;
+	d += RadialExpFogVolumeDistance4(s2, s3, gradientCenter, gradientInnerRadius, expCoeff);
+	d += RadialExpFogVolumeDistance4(s3, to, gradientCenter, gradientInnerRadius, expCoeff);
+	return d;
+}
+
+

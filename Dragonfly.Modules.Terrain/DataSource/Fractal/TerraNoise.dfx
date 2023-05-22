@@ -1,0 +1,118 @@
+﻿shader: TerraNoise;
+using Noise;
+using Gradients;
+
+#define TERRA_N 24.0
+
+float3 PowTerraN(float3 x)
+{
+    float3 x2 = x * x;
+    float3 x4 = x2 * x2;
+    float3 x8 = x4 * x4;
+    float3 x16 = x8 * x8;
+    return x16 * x8;
+}
+
+// k[0] = ocean average depth percent
+// k[1] = ocean depth variance percent
+// k[2] = peaks percent
+// k[3] = ratio between ocean and continents
+// m[0] = ocean level offset percent
+// m[1] = final ocean and continents height mul
+// m[2] = final mountains height mul
+// m[3] = unused
+
+float4 TerraNoiseDistr(float4 ch1, float4 ch2, float4 k, float4 m, float4 peaksModulation)
+{
+    // precalculated values
+    float x = ch1.w;
+    float mk1 = 1.0 - k[1];
+    float halfk13 = 0.5 * k[1] * k[3];
+    float y1den = mk1 * x + halfk13;
+	float safeX = max(EPS, x);
+	float3 xk3n = PowTerraN(float3(x, k[3], safeX / k[3]));
+    float xn = xk3n[0];
+    float k3n = xk3n[1];
+	float xnOverK3n = xk3n[2];
+    float y2mul = (1.0 - k[0] / (mk1 + halfk13)) * (1.0 + k3n);
+	float k3nxnRatioInv = 1.0 / (1.0 + xnOverK3n); // factored kn / (xn + kn) to avoid issues with PowTerraN overflow and div by 0
+	float xnk3nRatioInv = 1.0 / (1.0 + 1.0 / xnOverK3n); // factored xn / (xn + kn) to avoid issues with PowTerraN overflow and div by 0
+
+    // calc f1 and its derivative d1
+	float f1 = k[0] * x / y1den + y2mul * xnk3nRatioInv;
+	float d1 = halfk13 * k[0] / (y1den * y1den) + y2mul * TERRA_N * xnk3nRatioInv * k3nxnRatioInv / safeX;
+    float4 fnoise = float4(d1 * ch1.xyz, f1);
+
+    // precalculated values
+    x = ch2.w;
+    float xmh = x - 0.5;
+    float k2b = 20.0 / max(0.0001, k[2] * k[2]);
+	float k2bx = -k2b * xmh;
+    float ex = exp(k2bx * xmh);
+	float mk2 = 1.0 - k[2];
+
+    // calc f2 and its derivatie d2
+    float f2 = k[2] + mk2 * ex;
+    float d2 = mk2 * 2.0 * k2bx * ex;
+    float4 mnoise = float4(d2 * ch2.xyz, f2);
+
+    // mask and randomize peaks
+    float4 peakMask = ch1;
+    peakMask.w -= k[3];
+    peakMask /= (1.0 - k[3]);
+    peakMask *= step(0, peakMask.w);
+    mnoise = GradMul(mnoise, peakMask);
+    mnoise = GradMul(mnoise, peaksModulation);
+
+    // combine noises
+    float4 terra = (fnoise - float4(0, 0, 0, m[0])) * m[1] + mnoise * m[2];
+
+    return terra;
+}
+
+float TerraNoiseMaxHeight(float4 m)
+{
+    return (1.0 - m[0]) * m[1] + m[2];
+}
+
+float TerrainNoiseAvgOceanDepth(float4 k, float4 m)
+{
+    return m[1] * (m[0] - k[0]);
+}
+
+float4 TerraNoiseNorm(float4 noise)
+{
+    // clip 10% (mostly empty)
+    noise = GradClip(noise, 0.1);
+
+    // approximate histogram normalization
+    noise = GradQuintic(noise); 
+    //noise = GradCubic(noise);
+
+    return noise;
+}
+
+float4 TerraNoiseDistributionDDX(float3 position, float4 distr, float4 k, float4 m, float2 texelOffset)
+{
+    float4 ch1;
+    float4 ch2;
+    NoiseDistributionDDX2(position, distr, texelOffset, ch1, ch2);
+    float4 terra = TerraNoiseDistr(TerraNoiseNorm(ch1), ch2, k, m, ConstToGrad(1.0));
+
+    return terra;
+}
+
+float4 TerraNoiseWorldDistributionDDX(float3 worldPos, int3 worldTile, float4 distr, float4 k, float4 m, float4 peaksModulation, float2 texelOffset)
+{
+    float4 ch1;
+    float4 ch2;
+    NoiseWorldDistributionDDX2(worldPos, worldTile, distr, texelOffset, ch1, ch2);
+    float4 terra = TerraNoiseDistr(TerraNoiseNorm(ch1), ch2, k, m, peaksModulation);
+    return terra;
+}
+
+float4 TerraNoiseWorldDistributionDDX(float3 worldPos, int3 worldTile, float4 distr, float4 k, float4 m, float2 texelOffset)
+{
+    return TerraNoiseWorldDistributionDDX(worldPos, worldTile, distr, k, m, ConstToGrad(1.0), texelOffset);
+}
+

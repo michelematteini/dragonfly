@@ -1,0 +1,264 @@
+﻿shader: AtmosphericScattering;
+using Volumetrics;
+using Sampling;
+using RayTracing;
+using Noise;
+
+// scattering sample count
+// causes most issue on sunset and on high altitudes
+// 32 sample remove any visible banding, 16 have some banding, 8 already produce incorrect result color-wise
+#define ATMO_SAMPLE_COUNT 16
+// number of zenith-angle splits for the irradiance lut, must be the same as the one in MtlModSSAtmosphere.cs
+#define ATMO_IRRADIANCE_SPLITS 3.0
+
+struct AtmosphereParams
+{
+    float3 location;
+    float maxDensityRadius;
+    float zeroDensityRadius;
+    float3 lightIntensity;
+    float3 lightDir;
+    float4 opticalDistLutScaleOffset;
+    float4 irradianceLutScaleOffset;
+    float3 rgbWavelengthsInv4;
+    float rayleighScatteringConst;
+    float mieScatteringConst;
+    float irradianceScatteringConst;
+    float heightDensityCoeff;
+    float mieDirFactor;
+    float irradianceIntensity;
+    float worldPosFlattenBlend;
+};
+
+void AtmosphereRayToSinHeight(float3 rayStart, float3 rayDir, AtmosphereParams atmoParams, out float h, out float sin, out float sinLight)
+{
+    float3 hvec = rayStart - atmoParams.location;
+    float r = length(hvec);
+    float3 hdir = hvec / r;
+    h = r - atmoParams.maxDensityRadius;
+    sin = dot(rayDir, hdir);
+    sinLight = dot(-atmoParams.lightDir, hdir);
+}
+
+float2 GetRayleighMiePhases(float cosViewLight, float g)
+{
+    float cosViewLight2 = cosViewLight * cosViewLight;
+    float g2 = g * g;
+    float onePlusCos2 = 1 + cosViewLight2;
+    
+    float2 phases;
+    phases.x = 0.5;
+    phases.y = (1.0 - g2) / ((2.0 + g2) * pow(1.0 + g2 - 2.0 * g * cosViewLight, 1.5));
+    return 1.5 * (1.0 + cosViewLight2) * phases;
+}
+
+/// irradiance light direction sin remapping
+// mainly to increase samples on sunsets, lowering it too much creates banding on the planet shadow
+#define ATMO_IRR_SIN_GAMMA 0.5
+float AtmoIrradianceUToSin(float uCoord)
+{
+	float sin = 2.0 * uCoord - 1.0;
+	return ATMO_IRR_SIN_GAMMA * sin / (1.0 + ATMO_IRR_SIN_GAMMA - abs(sin));
+}
+
+float AtmoIrradianceSinToU(float sin)
+{
+    sin = sin * (1.0 + ATMO_IRR_SIN_GAMMA) / (abs(sin) + ATMO_IRR_SIN_GAMMA);
+    return 0.5 * sin + 0.5;
+}
+
+/// optical depth heigh remapping (optional)
+// improve quality of the optical depth, especially with on close objects in with light at 12:00
+// may not be needed if scattering is attenuated enough near the camera.
+#define ATMO_HEIGHT_GAMMA 0.2
+float AtmoHeightUEncode(float h, float hrangeInv)
+{
+    float u = h * hrangeInv;
+    // u = u * (1.0 + ATMO_HEIGHT_GAMMA) / (u + ATMO_HEIGHT_GAMMA);
+    return u;
+}
+
+float AtmoHeightUDecode(float u, float hrange)
+{	
+    // u = ATMO_HEIGHT_GAMMA * u / (1.0 + ATMO_HEIGHT_GAMMA - u);
+	return u * hrange;
+}
+
+/// light color lut light direction sin remapping
+// mainly to increase samples on sunsets
+#define ATMO_LCOLOR_SIN_GAMMA 0.2 // NB: this value should match the one in CompAtmoLightFilter.cs
+float AtmoLightColorUToSin(float uCoord)
+{
+	float sin = 2.0 * uCoord - 1.0;
+	return ATMO_LCOLOR_SIN_GAMMA * sin / (1.0 + ATMO_LCOLOR_SIN_GAMMA - abs(sin));
+}
+
+float AtmoLightColorSinToU(float sin)
+{
+    sin = sin * (1.0 + ATMO_LCOLOR_SIN_GAMMA) / (abs(sin) + ATMO_LCOLOR_SIN_GAMMA);
+    return 0.5 * sin + 0.5;
+}
+
+// converts the occlusion from lut to a scattering modulation factor
+float AtmoLutOcclusionToScatteringMul(float lutOcclusion)
+{
+    // offset by 1.0 to blend occlusion below the surface (preserve some scattering with sun below horizon)
+	return saturate(200.0 * lutOcclusion + 1.0); 
+}
+
+// converts the occlusion from lut to a light modulation factor
+float AtmoLutOcclusionToLightMul(float lutOcclusion)
+{
+    // offset calibrated to return about a 76.8% modulation at sea level with the sun at zenith (1050 / 1367 W m-2)
+    // see https://www.newport.com/t/introduction-to-solar-radiation
+	return saturate(600.0 * lutOcclusion + 0.25);
+}
+
+float3 TraceAtmosphericScattering(float3 fromWP, float3 toWP, AtmosphereParams atmoParams, texture opticalDistLut, texture irradianceLut)
+{
+    // precalculate some values
+    float3 rayVec = toWP - fromWP;
+    float rayLen = length(rayVec);
+    float3 rayDir = rayVec / rayLen; 
+    float hrange = atmoParams.zeroDensityRadius - atmoParams.maxDensityRadius;
+    float hrangeInv = 1.0 / hrange;
+    float3 totalScatterConst = atmoParams.rayleighScatteringConst * atmoParams.rgbWavelengthsInv4 + atmoParams.mieScatteringConst;
+    
+    // calc height and sin(rayDir and lightDir) for the ray starting point
+    float h0, sin0, sin0Light;
+    AtmosphereRayToSinHeight(fromWP, rayDir, atmoParams, out h0, out sin0, out sin0Light);
+    float h0Norm = AtmoHeightUEncode(h0, hrangeInv);
+    
+    // prepare lut sampling locations
+    float3 localLutFromUV = float3(h0Norm, sin0, -sin0);
+    localLutFromUV.yz = 0.5 * localLutFromUV.yz + 0.5;
+    float3 lutFromUV = saturate(localLutFromUV) * atmoParams.opticalDistLutScaleOffset.xyy + atmoParams.opticalDistLutScaleOffset.zww;
+    // recalc irradiance coords scale to sample on a single slice
+    float2 irradianceLutScale = atmoParams.irradianceLutScaleOffset.xy;
+    irradianceLutScale.y = (irradianceLutScale.y + 2.0 * atmoParams.irradianceLutScaleOffset.w) / (1.0 + ATMO_IRRADIANCE_SPLITS) - 2.0 * atmoParams.irradianceLutScaleOffset.w;
+    
+    // prepare ray sampling locations
+    float sampleRayLen = rayLen / ATMO_SAMPLE_COUNT;
+    float3 sampleRayVec = sampleRayLen * rayDir;
+    float3 curSampleWP = fromWP + 0.5 * sampleRayVec; // sample half-way through the sample ray
+    
+    // iterate through samples and integrate non-scattered light at <fromWP>
+    float3 inScatter = (float3)0.0;
+    float4 irradiance = (float4)0.0;
+    float opticalDistToCamera = 0.0;
+    [loop] for (int i = 0; i < ATMO_SAMPLE_COUNT; i++)
+	{
+        // ====== out-scattering optical distance
+        
+        // calc height and sin(rayDir, and lightDir) for the sample
+        float h1, sin1, sin1Light;
+        AtmosphereRayToSinHeight(curSampleWP, rayDir, atmoParams, out h1, out sin1, out sin1Light);
+        float h1Norm = AtmoHeightUEncode(h1, hrangeInv);
+        
+        // prepare sample lut coords for both view ray and light ray
+		float4 localLutUV = float4(h1Norm, sin1, -sin1, sin1Light);
+		localLutUV.yzw = 0.5 * localLutUV.yzw + 0.5;
+		float4 lutUV = saturate(localLutUV) * atmoParams.opticalDistLutScaleOffset.xyyy + atmoParams.opticalDistLutScaleOffset.zwww;
+		float4 lutViewSortedUV = float4(lutFromUV.x, lutUV.x, lutFromUV.y, lutUV.y);
+        
+		if (h0 > h1)
+		{
+            // invert the view ray direction to avoid tracing below maxDensityRadius (causes precision issues)
+			lutViewSortedUV = float4(lutUV.x, lutFromUV.x, lutUV.z, lutFromUV.z);
+		}
+        
+        // approximate optical distance
+        opticalDistToCamera = sampleLevel0(opticalDistLut, lutViewSortedUV.xz).r - sampleLevel0(opticalDistLut, lutViewSortedUV.yw).r; // from the sample to the starting point with the difference between the two samples depth
+        float2 opticalDistToLightAndOcclusion = sampleLevel0(opticalDistLut, lutUV.xw).rg; // from the sample to the light
+        float totalOpticalDist = opticalDistToCamera + opticalDistToLightAndOcclusion.x; // total
+        
+        // ===== scatter light away and integrate the residual intensity
+        float3 totalOutScattering = totalScatterConst *  totalOpticalDist;
+        float sampleDensity = exp(-atmoParams.heightDensityCoeff * h1);
+		float occlusion = AtmoLutOcclusionToScatteringMul(opticalDistToLightAndOcclusion.y);
+        inScatter += occlusion * sampleDensity * exp(-totalOutScattering) * sampleRayLen;
+        
+        // integrate irradiance
+        float2 localIrrUVs = float2(AtmoIrradianceSinToU(-sin1Light), h1Norm);
+        float2 lutIrrUVs = saturate(localIrrUVs) * irradianceLutScale + atmoParams.irradianceLutScaleOffset.zw;
+        float4 sampleIrradiance = float4(sampleLevel0(irradianceLut, lutIrrUVs).rgb, 1.0);
+        sampleIrradiance *= sampleDensity; // more density, re-scatter more irradiance
+        sampleIrradiance *= exp(-atmoParams.irradianceScatteringConst * opticalDistToCamera); // irradiance far-away is out-scattered again and wont reach the camera
+        irradiance += sampleIrradiance;
+          
+        // move to the next sample
+        curSampleWP += sampleRayVec;
+	}
+
+    // scatter light to the camera
+    float cosViewLight = dot(rayDir, atmoParams.lightDir);
+    float2 rayleighMiePhase = GetRayleighMiePhases(cosViewLight, atmoParams.mieDirFactor); 
+    float3 scatteredLight = rayleighMiePhase.x * atmoParams.rayleighScatteringConst * atmoParams.rgbWavelengthsInv4 * inScatter; // rayleigh scattering
+    scatteredLight += rayleighMiePhase.y * atmoParams.mieScatteringConst * inScatter; // mie scattering
+    scatteredLight *= atmoParams.lightIntensity; // modulate with source light intensity
+    scatteredLight += atmoParams.irradianceIntensity * irradiance.rgb / irradiance.w * (1.0 - exp(-atmoParams.irradianceScatteringConst * opticalDistToCamera)); // add irradiance (divide by the total optical)
+    
+    return scatteredLight;
+}
+
+float3 TraceAtmosphericLightColor(float3 fromWP, AtmosphereParams atmoParams, texture opticalDistLut)
+{
+    // precalculate some values
+    float hrange = atmoParams.zeroDensityRadius - atmoParams.maxDensityRadius;
+    float hrangeInv = 1.0 / hrange;
+    float3 totalScatterConst = atmoParams.rayleighScatteringConst * atmoParams.rgbWavelengthsInv4 + atmoParams.mieScatteringConst;
+    
+    // calc height and lightDir sin for ray start point
+    float h0, sin0, sin0Light;
+    AtmosphereRayToSinHeight(fromWP, -atmoParams.lightDir, atmoParams, out h0, out sin0, out sin0Light);
+    float h0Norm = h0 * hrangeInv;
+
+    // prepare lut sampling locations
+    float2 localLightUV = float2(h0Norm, 0.5 * sin0 + 0.5);
+    float2 lutLightUV = saturate(localLightUV) * atmoParams.opticalDistLutScaleOffset.xy + atmoParams.opticalDistLutScaleOffset.zw;
+        
+    // approximate optical distance to the light
+    float2 opticalDistToLightAndOcclusion = sampleLevel0(opticalDistLut, lutLightUV).rg;
+	float occlusion = AtmoLutOcclusionToLightMul(opticalDistToLightAndOcclusion.y);
+        
+    // ===== scatter light away to get the residual intensity
+    float3 totalOutScattering = totalScatterConst *  opticalDistToLightAndOcclusion.x;
+	float3 inLightMul = occlusion * exp(-totalOutScattering);
+    
+    return inLightMul;
+}
+
+float3 TraceAtmosphericIrradiance(float3 fromWP, float3 surfaceNormal, AtmosphereParams atmoParams, texture irradianceLut, float2 irradianceLutTexelSize)
+{
+    // calc height and sin(rayDir and lightDir) for the ray starting point
+    float h, sin, sinLight;
+	AtmosphereRayToSinHeight(fromWP, surfaceNormal, atmoParams, out h, out sin, out sinLight);
+    float hrange = atmoParams.zeroDensityRadius - atmoParams.maxDensityRadius;
+    float hrangeInv = 1.0 / hrange;
+    float hNorm = AtmoHeightUEncode(h, hrangeInv);
+    hNorm *= (1.0 - atmoParams.worldPosFlattenBlend); // blend out wp precision issues on irradiance
+    
+    // calc irradiance interpolation coords
+    float sinCoord = 0.5 * (ATMO_IRRADIANCE_SPLITS - 1.0) * (1.0 - sin);
+    float sliceIndex = clamp(floor(sinCoord), 0.0, ATMO_IRRADIANCE_SPLITS - 2.0);
+    float sinAlpha = saturate(sinCoord - sliceIndex);
+    
+	// recalc irradiance coords scale to sample on a single slice
+    float2 irradianceLutScale = atmoParams.irradianceLutScaleOffset.xy;
+    irradianceLutScale.y = (irradianceLutScale.y + 2.0 * atmoParams.irradianceLutScaleOffset.w) / (1.0 + ATMO_IRRADIANCE_SPLITS) - 2.0 * atmoParams.irradianceLutScaleOffset.w;
+    
+    // calc first slice UV
+    float2 slice0UV = float2(AtmoIrradianceSinToU(-sinLight), hNorm);
+    slice0UV = slice0UV * irradianceLutScale + atmoParams.irradianceLutScaleOffset.zw;
+    slice0UV.y += (1.0 + sliceIndex) * irradianceLutScale.y; // move to the first slice, add 1 since the slot 0 is reverved for total irradiance
+    float2 sampleWeights, sliceTopLeftUV;
+    CalcBilinearCoords(slice0UV, irradianceLutTexelSize, out sliceTopLeftUV, out sampleWeights);
+    
+    // gather samples and interpolate slice
+    float4x4 samples = Gather(irradianceLut, sliceTopLeftUV, irradianceLutTexelSize) * (1.0 - sinAlpha); // first slice
+    sliceTopLeftUV.y += irradianceLutScale.y;
+    samples += Gather(irradianceLut, sliceTopLeftUV, irradianceLutTexelSize) * sinAlpha; // second slice
+        
+    // interpolate lut
+    return Bilinear(samples, sampleWeights).rgb;
+}

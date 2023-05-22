@@ -1,0 +1,62 @@
+﻿shader: MaskingMaterial;
+using Core; 
+using TemplSolid;
+using Displacement;
+using TexCoordScaling;
+using AlphaMasking;
+using TemplDepthPrePass;
+
+float3 diffuse_color;
+float shading_ammount;
+bool mask_screen_space;
+texture alphaMask;
+
+POS3_TEX_NORM GetVertexData(vertex_t IN)
+{
+	POS3_TEX_NORM Vertex = (POS3_TEX_NORM)0;
+	Vertex.position = DisplaceVertex(IN.position, IN.normal, IN.texCoords);
+	Vertex.texCoords = TransformTexCoords(IN.texCoords); // apply coords scaling
+	Vertex.texCoords = (Vertex.texCoords - 0.5) * float2(2.0, -2.0);
+	Vertex.normal = IN.normal;
+	return Vertex;
+}
+
+void PostWorldSpaceProcessing(inout SolidVertexIntermediates data)
+{
+
+}
+
+void PostScreenSpaceProcessing(inout SolidVertexIntermediates data)
+{
+	if (mask_screen_space)
+	{
+		data.texCoords = data.screenPos.xy / data.screenPos.w;
+	}
+}
+
+float4 GetPixelColor(SolidPixelInputs IN)
+{
+	float4 OUT;
+
+	float2 maskCoords = IN.texCoords * float2(0.5, -0.5) + 0.5;
+	OUT.a = sample(alphaMask, maskCoords).a;
+	maskPixel(OUT.a);
+
+	float shadingMul = dot(normalize(IN.normal), float3(0.57735, 0.57735, 0.57735));
+	shadingMul = lerp(1.0, shadingMul, shading_ammount);
+	OUT.rgb = diffuse_color * shadingMul;
+
+	return OUT;
+}
+
+float GetPixelDepth(float4 screenPos, float2 texCoords)
+{
+	float2 maskCoords = texCoords * float2(0.5, -0.5) + 0.5;
+	float alpha = sample(alphaMask, maskCoords).a;
+	maskPixel(alpha);
+
+	return screenPos.z / screenPos.w;
+}
+
+
+effect MaskingMaterial : Solid(POS3_TEX_NORM), DepthPrePass(POS3_TEX_NORM);

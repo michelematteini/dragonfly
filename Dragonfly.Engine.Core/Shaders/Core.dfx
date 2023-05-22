@@ -1,0 +1,25 @@
+﻿shader: Core;
+
+global float4x4 CAMERA_MATRIX;
+global float4x4 CAMERA_INVERSE;
+global dynamic float4x4 WORLD_MATRIX;
+global dynamic float3x3 NRM_WORLD_MATRIX;
+global float3 CAMERA_POS;
+global float3 CAMERA_DIR;
+global float3 CAMERA_UP;
+global float2 PIX_SIZE;
+
+// DEPRECATED: avoiding using the world tile in shader is possible, making full world-coordinate CPU-only.
+// This make it possible to change or updated them in the future.
+//global int3 WORLD_TILE; // the current tile index
+
+
+// size of a single world tile, after which camera positions wrap to allow higher precision
+#define WTILE_SIZE 1024.0
+
+// Convert screen position to world position
+float3 ScreenPosToWorld(float4 screenPos)
+{
+	float4 hWorld = mul(screenPos, CAMERA_INVERSE);
+	return hWorld.xyz / hWorld.w;
+}

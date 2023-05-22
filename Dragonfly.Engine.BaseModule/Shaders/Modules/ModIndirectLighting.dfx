@@ -1,0 +1,31 @@
+﻿shader: ModIndirectLighting;
+using ModAtmosphere;
+using AtmosphericScatteing;
+using Physical;
+
+variant radianceMode: RadianceMap, NoRadiance, AtmosphericRadiance;
+texture radianceMap : NoFilter; // radiance map, content depends on the radianceMode
+
+float3 GetRadiance(PhysicalShadingParams IN)
+{
+	float3 radiance = (float3)0.0;
+#if radianceMode == RadianceMap
+	radiance = sampleHDRCube2D(radianceMap, texelSize(radianceMap), IN.m.normal, MaterialRoughnessToMipmap(IN.m.roughness));	
+#elif radianceMode == AtmosphericRadiance
+	AtmosphereParams atmo = GetAtmosphere();
+	radiance = TraceAtmosphericIrradiance(IN.worldPos, IN.m.normal, atmo, radianceMap, texelSize(radianceMap));
+#endif
+	return radiance;
+}
+
+float3 GetIrradiance(PhysicalShadingParams IN)
+{
+	float3 irradiance = (float3)0.0;
+#if radianceMode == RadianceMap
+	irradiance = sampleHDRCube2D(radianceMap, texelSize(radianceMap), IN.m.normal, GGX_MAX_MIPMAP);
+#elif radianceMode == AtmosphericRadiance
+	AtmosphereParams atmo = GetAtmosphere();
+	irradiance = TraceAtmosphericIrradiance(IN.worldPos, IN.m.normal, atmo, radianceMap, texelSize(radianceMap));
+#endif
+	return irradiance;
+}

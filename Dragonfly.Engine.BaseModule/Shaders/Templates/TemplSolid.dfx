@@ -1,0 +1,63 @@
+﻿shader: TemplSolid;
+using Core;
+using Layouts;
+using SolidCommon;
+using ScreenSpace;
+
+template POS3_TEX_NORM GetVertexData(vertex_t IN);
+
+template void PostWorldSpaceProcessing(inout SolidVertexIntermediates data);
+
+template void PostScreenSpaceProcessing(inout SolidVertexIntermediates data);
+
+VS POS4_TEX_NORM_WORLD4_SCREEN4 Solid(vertex_t IN)
+{
+	POS3_TEX_NORM vertex = GetVertexData(IN);
+	SolidVertexIntermediates data;
+	data.worldPos = float4(vertex.position, 1.0);
+	data.worldPos = mul(data.worldPos, INSTANCE_MATRIX);
+	data.worldPos = mul(data.worldPos, WORLD_MATRIX);
+	data.texCoords = vertex.texCoords;
+	data.worldNormal = mul(vertex.normal, (float3x3)INSTANCE_MATRIX);
+	data.worldNormal = mul(data.worldNormal, NRM_WORLD_MATRIX);
+	data.screenPos = data.worldPos;
+
+	PostWorldSpaceProcessing(inout data);
+
+	data.screenPos = mul(data.worldPos, CAMERA_MATRIX);
+	
+	PostScreenSpaceProcessing(inout data);
+
+	POS4_TEX_NORM_WORLD4_SCREEN4 OUT;
+	OUT.position = data.screenPos;
+	OUT.texCoords = data.texCoords;
+	OUT.normal = data.worldNormal;
+	OUT.worldPos = data.worldPos;
+	OUT.screenPos = data.screenPos;
+	return OUT;
+}
+
+struct SolidPixelInputs
+{
+	float2 texCoords;
+	float3 normal;
+	float3 worldPos;
+	float2 screenUV;
+};
+
+template float4 GetPixelColor(SolidPixelInputs IN);
+
+PS RT_COLOR Solid(POS4_TEX_NORM_WORLD4_SCREEN4 IN)
+{
+	RT_COLOR OUT;
+	SolidPixelInputs solvedIN;
+	solvedIN.texCoords = IN.texCoords;
+	solvedIN.normal = IN.normal;
+	solvedIN.worldPos = IN.worldPos.xyz / IN.worldPos.w;
+	solvedIN.screenUV = ClipSpaceToUV(IN.screenPos);
+	OUT.color = GetPixelColor(solvedIN);
+	return OUT;
+}
+
+// Basic effect template for a solid to be displayed in the main solid pass.
+instanced template effect Solid{ VS = Solid, PS = Solid };

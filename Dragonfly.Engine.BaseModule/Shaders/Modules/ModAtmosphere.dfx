@@ -1,0 +1,48 @@
+﻿shader: ModAtmosphere;
+using AtmosphericScattering;
+
+float3 atmoLocation;
+float atmoMaxDensityRadius;
+float atmoZeroDensityRadius;
+float atmoHeightDensityCoeff;
+float3 atmoLightDir;
+float atmoMieDirFactor;
+float3 atmoLightIntensity;
+float4 atmoOpticalDistLutScaleOffset;
+float4 atmoIrradianceLutScaleOffset;
+float3 atmoRgbWavelengthsInv4;
+float atmoRayleighScatteringConst;
+float atmoMieScatteringConst;
+float atmoIrradianceScatteringConst;
+float atmoIrradianceIntensity;
+float atmoWorldPosFlattenBlend;
+int atmoListIndex;
+texture atmoParamsList : NoFilter, Clamp, NoMipMaps;
+
+AtmosphereParams GetAtmosphere()
+{
+    AtmosphereParams params;
+    params.location = atmoLocation;
+    params.worldPosFlattenBlend = atmoWorldPosFlattenBlend;
+    if (atmoListIndex >= 0)
+    {
+        // dynamic params from the atmosphere list buffer
+        float4 p0 = sampleLevel0(atmoParamsList, float2(0.5, atmoListIndex + 0.5) * texelSize(atmoParamsList));
+        params.location = p0.xyz;
+        params.worldPosFlattenBlend = p0.w;
+    }
+    params.maxDensityRadius = atmoMaxDensityRadius;
+    params.zeroDensityRadius = atmoZeroDensityRadius;
+    params.heightDensityCoeff = atmoHeightDensityCoeff;
+    params.lightDir = atmoLightDir;
+    params.mieDirFactor = atmoMieDirFactor;
+    params.lightIntensity = atmoLightIntensity;
+    params.opticalDistLutScaleOffset = atmoOpticalDistLutScaleOffset;
+    params.irradianceLutScaleOffset = atmoIrradianceLutScaleOffset;
+    params.rgbWavelengthsInv4 = atmoRgbWavelengthsInv4;
+    params.rayleighScatteringConst = atmoRayleighScatteringConst;
+    params.mieScatteringConst = atmoMieScatteringConst;
+    params.irradianceScatteringConst = atmoIrradianceScatteringConst;
+    params.irradianceIntensity = atmoIrradianceIntensity;
+    return params;
+}

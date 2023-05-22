@@ -1,0 +1,108 @@
+﻿shader: Layouts;
+
+// === common IN-OUT structures
+
+layout POS3_TEX_NORM
+{
+	float3 position : POSITION;
+	float2 texCoords : TEXCOORD0;
+	float3 normal : TEXCOORD1;
+};
+
+layout POS4_TEX_NORM
+{
+	float4 position : POSITION;
+	float2 texCoords : TEXCOORD0;
+	float3 normal : TEXCOORD1;
+};
+
+layout POS4_TEX4_NORM
+{
+	float4 position : POSITION;
+	float4 texCoords : TEXCOORD0;
+	float3 normal : TEXCOORD1;
+};
+
+layout POS4_TEX_NORM_WORLD3
+{
+	float4 position : POSITION;
+	float2 texCoords : TEXCOORD0;
+	float3 normal : TEXCOORD1;
+	float3 worldPos : TEXCOORD2;
+};
+
+layout POS4_TEX_NORM_WORLD4
+{
+	float4 position : POSITION;
+	float2 texCoords : TEXCOORD0;
+	float3 normal : TEXCOORD1;
+	float4 worldPos : TEXCOORD2;
+};
+
+layout POS4_TEX_NORM_WORLD4_SCREEN4
+{
+	float4 position : POSITION;
+	float2 texCoords : TEXCOORD0;
+	float3 normal : TEXCOORD1;
+	float4 worldPos : TEXCOORD2;
+	float4 screenPos : TEXCOORD3;
+};
+
+layout POS4_TEX
+{
+	float4 position : POSITION;
+	float2 texCoords : TEXCOORD0;
+};
+
+layout POS4_TEX_WORLD4
+{
+	float4 position : POSITION;
+	float2 texCoords : TEXCOORD0;
+	float4 worldPos : TEXCOORD1;
+};
+
+layout POS4_TEX_SCREEN4
+{
+	float4 position : POSITION;
+	float2 texCoords : TEXCOORD0;
+	float4 screenPos : TEXCOORD1;
+};
+
+layout POS4_TEX_NORM_SCREEN4
+{
+	float4 position : POSITION;
+	float2 texCoords : TEXCOORD0;
+	float4 screenPos : TEXCOORD1;
+	float3 normal : TEXCOORD2;
+};
+
+layout POS4_TEX4
+{
+	float4 position : POSITION;
+	float4 texCoords : TEXCOORD0;
+};
+
+layout RT_COLOR
+{
+	color color : COLOR0;
+};
+
+layout RT_FLOAT4
+{
+	float4 color : COLOR0;
+};
+
+layout RT_FLOAT2
+{
+	float2 color : COLOR0;
+};
+
+layout RT_HALF2
+{
+	half2 color : COLOR0;
+};
+
+layout RT_HALF
+{
+	half color : COLOR0;
+};

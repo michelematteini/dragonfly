@@ -1,0 +1,292 @@
+﻿shader: LightsCommon;
+using Core;
+using Noise;
+using EnvMaps;
+
+global int lightCount;
+global texture lightList : NoFilter; // buffer containing lights and shadowmaps info
+global texture shadowAtlas : NoFilter, BorderWhite; // the atlas of all the available shadow maps
+
+#define POINT_LIGHT 0
+#define DIRECTIONAL_LIGHT 1
+#define SPOT_LIGHT 2
+
+struct LIGHT
+{
+	int type;
+	int smCount; // number of shadow maps: > 1 for cascades, 6 for cubemaps, 0 for no shadows
+
+	float3 pos;
+	float3 dir;
+	float3 color;
+	float2 cosInOutRadius;
+	float2 smDataCoords; // lightList coords for the start of the first shadowmap record
+};
+
+#define LIGHT_STRUCT_SIZE4 4
+LIGHT GetLight(int index)
+{
+	LIGHT l = (LIGHT)0;
+
+	// decode light params
+	float2 liCoords = float2(0.5, 0.5 + index) * texelSize(lightList);
+	float4 linfo = sampleLevel0(lightList, liCoords);
+	l.type = linfo.w;
+	l.pos = linfo.xyz;
+
+	liCoords.x += texelSize(lightList).x;
+	linfo = sampleLevel0(lightList, liCoords);
+	l.color = linfo.rgb;
+	l.cosInOutRadius.x = linfo.w;
+
+	liCoords.x += texelSize(lightList).x;
+	linfo = sampleLevel0(lightList, liCoords);
+	l.dir = linfo.xyz;
+	l.cosInOutRadius.y = linfo.w;
+
+	liCoords.x += texelSize(lightList).x;
+	linfo = sampleLevel0(lightList, liCoords);
+	l.smCount = (int)linfo.x;
+	l.smDataCoords = float2(0.5 + LIGHT_STRUCT_SIZE4, 0.5 + linfo.y) * texelSize(lightList);
+
+	return l;
+}
+
+float4x4 FetchSmTransform3x3(float2 smDataCoords)
+{
+	float4x4 smMatrix = (float4x4)0;
+	float2 colOffset = float2(texelSize(lightList).x, 0);
+	SetColumn(smMatrix, sampleLevel0(lightList, smDataCoords), 0);
+	SetColumn(smMatrix, sampleLevel0(lightList, smDataCoords + colOffset), 1);
+	SetColumn(smMatrix, sampleLevel0(lightList, smDataCoords + colOffset * 2.0), 2);
+	smMatrix[3][3] = 1.0;
+	return smMatrix;
+}
+
+float4x4 FetchSmTransform4x4(float2 smDataCoords)
+{
+	float4x4 smMatrix = (float4x4)0;
+	float2 colOffset = float2(texelSize(lightList).x, 0);
+	SetColumn(smMatrix, sampleLevel0(lightList, smDataCoords), 0);
+	SetColumn(smMatrix, sampleLevel0(lightList, smDataCoords + colOffset), 1);
+	SetColumn(smMatrix, sampleLevel0(lightList, smDataCoords + colOffset * 2.0), 2);
+	SetColumn(smMatrix, sampleLevel0(lightList, smDataCoords + colOffset * 3.0), 3);
+	return smMatrix;
+}
+
+void SelectCubeSmCoords(float3 worldPos, inout float2 smDataCoords)
+{
+	float3 shadowPos = sampleLevel0(lightList, smDataCoords + float2(5.0 * texelSize(lightList).x, 0)).xyz; // cached cubemap shadow positions
+	float3 smFaceDir = GetCubeFaceDir(normalize(worldPos - shadowPos));
+	float smFaceIndex = round(CubeFaceDirToID(smFaceDir));
+	smDataCoords.y += smFaceIndex * texelSize(lightList).y;
+}
+
+void SelectCascadeTransform(int splitCount, float4 worldPos, inout float2 smDataCoords, out float3 lvPos, out float4x4 smTransform)
+{
+	// TODO: this csm blending has been disabled since it may force sampling of a subsequent slice, that could be unavailable, leaving gaps.
+	float csmSelectTHR = 0;//Noise3x2(1000.0 * worldPos.xyz).x * CSM_BLEND_PERCENT + CSM_BORDER_PERCENT;
+
+	[loop] for (int i = 0; i < splitCount; i++, smDataCoords.y += texelSize(lightList).y)
+	{
+		// check if split [i] contains worldPos
+		smTransform = FetchSmTransform3x3(smDataCoords);
+
+#ifdef Directx9
+		lvPos = mul(worldPos, smTransform).xyz;
+		if (all(float3(abs(lvPos.x) + csmSelectTHR, abs(lvPos.y) + csmSelectTHR, 1.0 - lvPos.z) < 1.0))
+			break; // correct split found
+#else
+		lvPos.x = dot(worldPos, GetColumn(smTransform, 0));
+		if ((abs(lvPos.x) + csmSelectTHR) >= 1.0)
+			continue;
+		lvPos.y = dot(worldPos, GetColumn(smTransform, 1));
+		if ((abs(lvPos.y) + csmSelectTHR) >= 1.0)
+			continue;
+		lvPos.z = dot(worldPos, GetColumn(smTransform, 2));
+		if (lvPos.z >= 0)
+			break; // correct split found
+#endif
+	}
+}
+
+#define BLOCKER_SEARCH_SAMPLE_COUNT 8
+#define SAMPLE_COUNT 24
+#define MIN_BLUR_SIZE_PIX 2.0
+#define MAX_BLUR_SIZE_PIX 16.0
+#define CORRECT_SAMPLE_DEPTH
+
+#ifdef CORRECT_SAMPLE_DEPTH
+
+float CalcQuantizationBias(float4x4 smTransform, float3 worldPos, float4x4 smTransformInverse, float4 smScaleOffset, float3 surfaceNormal, float3 lightVector, float4 lightClipPos)
+{
+	// calc the sm texel size in world space (if its a perspective proj, the size is at the wp depth)
+	float worldTexelSize = CalcWorldSpaceTexelSize(worldPos, lightClipPos, smTransformInverse, texelSize(shadowAtlas) / smScaleOffset.xy).y; // use only one component for performance
+	
+	// calc partial derivative of the depth over the world-space axes
+	float4 c2 = GetColumn(smTransform, 2);
+	float4 c3 = GetColumn(smTransform, 3);
+	float4 w = float4(worldPos, 1.0);
+	float dot_c3_w = dot(c3, w);
+	float3 ddwz = (c2.xyz * dot_c3_w - c3.xyz * dot(c2, w)) / (dot_c3_w * dot_c3_w);
+	// calc l dot n (cosine)
+	float l_dot_n = dot(lightVector, surfaceNormal);
+	float l_dot_n2 = l_dot_n * l_dot_n;
+	// convert v dot n to the tangent: will be used to project the texel along z
+	//float texelDepthRatio = min(32.0, sqrt(1 - l_dot_n2) / l_dot_n); // correct but slow tangent
+	float viewTan = min(32.0, (1.0 - 0.585 * l_dot_n2) / l_dot_n); // fast tan approx (bad for v_dot_n < 1, but doesn't matter)
+	// project the texel size in the z direction to get the maximum z error caused by the texel, and used it as a z-bias
+	// dot(v, ddwz) is how much depth change for each meter along v
+	// worldTexelSize * viewTan is the distance along v before the texel project back to the ideal surface oriented as n 
+	// (because the texel is always facing the camera, since z is fixed in it, which is what create a z error)
+	return dot(lightVector, ddwz) * worldTexelSize * viewTan * GetShadowBias().quantizationBias;
+}
+
+#endif
+
+float GetNoiseDensity(float3 worldPos)
+{
+	float3 viewVec = CAMERA_POS  - worldPos;
+	float viewDistSQ = dot(viewVec, viewVec);
+	float log2dist;
+	frexp(160000000.0 / viewDistSQ, log2dist);
+	return exp2(0.5 * log2dist);
+}
+
+float SampleSM(float4 lightClipPos, float4 smScaleOffset, float depthRangeToUVBlurRadius, float3 worldPos, float4x4 smTransform, float4x4 smTransformInverse, float3 surfaceNormal, float3 lightVector)
+{
+	// calc SM coords and bounds inside the atlas
+	float4 smBoundsMinMax = 0.5 * texelSize(shadowAtlas).xyxy;
+	smBoundsMinMax.zw = smScaleOffset.xy - smBoundsMinMax.zw;
+	smBoundsMinMax += smScaleOffset.zwzw;
+	float2 smCoords = saturate(float2(0.5, -0.5) * lightClipPos.xy + 0.5) * smScaleOffset.xy + smScaleOffset.zw;
+	
+	float lightMul = 1.0;
+	
+#ifdef Directx9
+	smCoords = clamp(smCoords, smBoundsMinMax.xy, smBoundsMinMax.zw); // stay inside the shadow map
+	float smValue = sampleLevel0(shadowAtlas, smCoords).x;
+	lightMul = step(smValue, lightClipPos.z);
+#else
+	
+	// blur radius bounds in sm texels
+	float2 diskRadiusMinMax = float2(MIN_BLUR_SIZE_PIX, MAX_BLUR_SIZE_PIX) * texelSize(shadowAtlas).x;	
+	
+	// rnd offsets
+	float2 rnd = TiledWorldNoise3x2Point(worldPos, GetNoiseDensity(worldPos), 0);
+	float rndRotation = rnd.x * TWO_PI;
+	
+#ifdef CORRECT_SAMPLE_DEPTH
+	// calc quantization bias to correct the samples depth
+	float qbias = CalcQuantizationBias(smTransform, worldPos, smTransformInverse, smScaleOffset, surfaceNormal, lightVector, lightClipPos) / texelSize(shadowAtlas).y;
+#endif
+	
+	// search for blockers and their distance
+	float blockerCount = 0.0; // number of occluded samples
+	float avgBlockerDepth = 0.0; // average occluders depth in light clip space
+	[loop] for (int bi = 0; bi < BLOCKER_SEARCH_SAMPLE_COUNT; bi++)
+	{
+		// calc sm coords
+		float2 deltaCoords = PoissonDiskSQ(bi, BLOCKER_SEARCH_SAMPLE_COUNT, diskRadiusMinMax.y, rndRotation);
+		float2 smSampleCoord = clamp(smCoords + deltaCoords, smBoundsMinMax.xy, smBoundsMinMax.zw); // stay inside the shadow map
+
+		// sample sm depth
+		float smDepth = sampleLevel0(shadowAtlas, smSampleCoord).x;
+#ifdef CORRECT_SAMPLE_DEPTH
+		smDepth += max(abs(deltaCoords.x), abs(deltaCoords.y)) * qbias;
+#endif		
+		// calc world position depth from light pov
+		float worldDepth = lightClipPos.z;
+
+		float blocker = step(worldDepth, smDepth);
+		blockerCount += blocker;
+		avgBlockerDepth += smDepth * blocker;
+	}
+	avgBlockerDepth /= blockerCount;
+	
+
+	// early out if no blocker is found
+	if(blockerCount > 0)
+	{	
+		// calc blur size base on blocker depth
+		float blurRadiusUV = 0.5 * depthRangeToUVBlurRadius * (avgBlockerDepth - lightClipPos.z);
+		blurRadiusUV = clamp(blurRadiusUV, diskRadiusMinMax.x, diskRadiusMinMax.y);
+
+		// randomly offset the sampling coords in a texel to avoid sm texel being visible close up
+		float2 smJitterCoords = smCoords + (rnd - 0.5) * texelSize(shadowAtlas);
+		
+		// sample shadow map with the scaled and rotated poisson disk and accumulate occlusion
+		float avgOcclusion = 0.0;
+		[loop] for (int si = 1/*skip the central tap*/; si <= SAMPLE_COUNT; si++)	
+		{
+			// calc sm coords
+			float2 deltaCoords = PoissonDiskSQ(si, SAMPLE_COUNT + 1, blurRadiusUV, rndRotation);
+			float2 smSampleCoord = clamp(smJitterCoords + deltaCoords, smBoundsMinMax.xy, smBoundsMinMax.zw); // stay inside the shadow map
+
+			// sample sm depth
+			float smDepth = sampleLevel0(shadowAtlas, smSampleCoord).x;	
+#ifdef CORRECT_SAMPLE_DEPTH
+			smDepth += max(abs(deltaCoords.x), abs(deltaCoords.y)) * qbias;
+#endif		
+			// calc world position depth from light pov
+			float worldDepth = lightClipPos.z;
+			
+			float occlusion = step(smDepth, worldDepth);
+			avgOcclusion += occlusion;
+		}
+		
+		lightMul = avgOcclusion / SAMPLE_COUNT;
+	}
+
+#endif // #ifdef Directx9 #else
+	
+	return lightMul;
+}
+
+float GetShadowMul(float4 worldPos, LIGHT light, float3 lightVector, float3 surfaceNormal)
+{
+	float shadowMul = 1.0;
+
+	if (light.smCount > 0)
+	{
+		float4 lvPos = float4(0, 0, 0, 1.0);
+		float2 smDataCoords = light.smDataCoords;
+		float4x4 smTransform;
+
+		if (light.type == DIRECTIONAL_LIGHT)
+		{
+			SelectCascadeTransform(light.smCount, worldPos, inout smDataCoords, out lvPos.xyz, out smTransform);
+		}
+		else
+		{
+			if (light.type == POINT_LIGHT)
+				SelectCubeSmCoords(worldPos.xyz, inout smDataCoords);
+
+			smTransform = FetchSmTransform4x4(smDataCoords);
+			lvPos = mul(worldPos, smTransform);
+		}
+		
+		lvPos /= lvPos.w;
+
+		// clip sm borders
+		if (all(abs(float3(lvPos.xy, 2.0 * lvPos.z - 1.0)) < 1.0))
+		{
+			// retrieve sm data
+			smDataCoords.x += 4.0 * texelSize(lightList).x;
+			float4 smScaleOffset = sampleLevel0(lightList, smDataCoords);
+
+			float blurSize = 0;
+			float4x4 smTransformInverse = (float4x4)0;
+#ifndef Directx9
+			smDataCoords.x += texelSize(lightList).x;
+			blurSize = sampleLevel0(lightList, smDataCoords).w * smScaleOffset.x;
+			smDataCoords.x += texelSize(lightList).x;
+			smTransformInverse = FetchSmTransform4x4(smDataCoords);
+#endif
+			// sample  shadow atlas
+			shadowMul = SampleSM(lvPos, smScaleOffset, blurSize, worldPos.xyz, smTransform, smTransformInverse, surfaceNormal, lightVector);
+		}
+	}
+
+	return shadowMul;
+}

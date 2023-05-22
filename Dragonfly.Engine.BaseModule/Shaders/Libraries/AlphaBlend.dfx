@@ -1,0 +1,12 @@
+﻿shader: AlphaBlend;
+
+/// <summary>
+/// Returns the transparent color that will alpha blend over another as if background and top were blended in sequence.
+/// </summary>
+float4 CompositeAlphaBlend(float4 background, float4 top, float topAlpha)
+{
+	float4 composite;
+	composite.a = 1 - (1 - top.a * topAlpha) * (1 - background.a);
+	composite.rgb = lerp(background.rgb * background.a, top.rgb, top.a * topAlpha) / max(0.0001, composite.a);
+	return composite;
+}

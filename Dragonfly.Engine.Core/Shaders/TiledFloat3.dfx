@@ -1,0 +1,36 @@
+﻿shader: TiledFloat3;
+using Core;
+
+struct TiledFloat3
+{
+	float3 value;
+	float3 tile;
+};
+
+TiledFloat3 TF3_Make(float3 value, int3 tile)
+{
+	TiledFloat3 result;
+	result.value = value;
+	result.tile = tile;
+	return result;
+}
+
+float3 TF3_Expand(TiledFloat3 pos)
+{
+	return pos.value + WTILE_SIZE * pos.tile;
+}
+
+float3 TF3_ToFloat3(TiledFloat3 pos, int3 referenceTile)
+{
+	return pos.value + (pos.tile - referenceTile) * WTILE_SIZE;
+}
+
+TiledFloat3 TF3_Add(TiledFloat3 p1, TiledFloat3 p2)
+{
+	return TF3_Make(p1.value + p2.value, p1.tile + p2.tile);
+}
+	
+TiledFloat3 TF3_Sub(TiledFloat3 p1, TiledFloat3 p2)
+{
+	return TF3_Make(p1.value - p2.value, p1.tile - p2.tile);
+}

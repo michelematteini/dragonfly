@@ -1,0 +1,80 @@
+﻿shader: PostProcessPass;
+
+using Core;
+using ScreenSpace;
+using ColorConversion;
+using RayTracing;
+using ExponentialFog;
+using Depth;
+using SSFlare;
+using SSAtmosphere;
+using Dithering;
+
+float exposure;
+float tonemappingType;
+#define TONEMAPPING_LINEAR 0
+#define TONEMAPPING_REINHARD 1.0
+#define TONEMAPPING_LOGLUV 2.0
+#define TONEMAPPING_RGBE 3.0
+texture rgbeInput : NoFilter, NoMipMaps, Clamp;
+texture depthInput : NoFilter, NoMipMaps, Clamp;
+float4x4 invCameraMatrix;
+float3 cameraPos;
+variant ditheringEnabled;
+
+// Encode the specified color using the currently active tonemapping.
+float4 EncodeOutput(float4 color)
+{
+    color.rgb = max(0, color.rgb);
+
+    if (tonemappingType == TONEMAPPING_REINHARD)
+        color.rgb = EncodeSRGB(color.rgb / (color.rgb + 1));
+    else if (tonemappingType == TONEMAPPING_LOGLUV)
+        color = EncodeLogLuv(color.rgb);
+    else if (tonemappingType == TONEMAPPING_LINEAR)
+        color.rgb = EncodeSRGB(color.rgb);
+    else if (tonemappingType == TONEMAPPING_RGBE)
+        color = EncodeRGBE(color.rgb);
+
+    return color;
+}
+
+PS RT_COLOR PostProcessPass(POS4_TEX_NORM IN)
+{
+    RT_COLOR OUT = (RT_COLOR)0;
+	OUT.color = sample(rgbeInput, IN.texCoords);
+
+    float clipDepth = DecodeDepth16(sample(depthInput, IN.texCoords).r);
+    float3 worldPos = ClipDepthToWorldPos(clipDepth, IN.texCoords, invCameraMatrix);
+	
+    if (OUT.color.a == 1.0) 
+        return OUT; // a == 1 means that no post processing should be applied    
+
+    // decode color
+    float4 hdrColor = (float4)1.0;
+    hdrColor.rgb = DecodeRGBE(OUT.color);
+
+    // apply atmosphere
+    ApplyAllAtmospheres(worldPos, cameraPos, inout hdrColor);
+
+    // apply fog color
+    ApplyExpFog(worldPos, cameraPos, inout hdrColor);
+
+    // apply flares
+    ApplyAllFlares(IN.texCoords, depthInput, inout hdrColor);
+
+    // apply exposure
+    hdrColor.rgb *= exposure;
+
+    // encode to the required output space
+    OUT.color = EncodeOutput(hdrColor);
+    
+#ifdef ditheringEnabled
+    // dithering
+    OUT.color.rgb += ScreenDithering(IN.texCoords, PIX_SIZE, 1.0 / 256.0);
+#endif
+
+	return OUT;
+}
+
+effect PostProcessPass {VS = ScreenPass, PS = PostProcessPass};

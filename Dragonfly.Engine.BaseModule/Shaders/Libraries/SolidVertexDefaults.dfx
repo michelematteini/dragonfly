@@ -1,0 +1,18 @@
+﻿// define default implementations for normal meshes of the solid template methods used for vertex processing
+shader: SolidVertexDefaults;
+using Layouts;
+
+POS3_TEX_NORM GetVertexData(vertex_t IN)
+{
+	return IN;
+}
+
+void PostWorldSpaceProcessing(inout SolidVertexIntermediates data)
+{
+	
+}
+
+void PostScreenSpaceProcessing(inout SolidVertexIntermediates data) 
+{
+	
+}

@@ -1,0 +1,109 @@
+﻿shader: TemplPhysical;
+
+using Core;
+using Math;
+using TemplLitSolid;
+using Physical;
+
+texture brdf_lut : Clamp; // lut for ggx split-sum integration factors
+
+struct PhysicalMatParams
+{
+	float3 albedo;
+	float3 normal;
+	float roughness;
+	float3 specular;
+};
+
+struct PhysicalShadingParams
+{
+	PhysicalMatParams m;
+	float3 v;
+	float r2;
+	float n_dot_v;
+	float3 worldPos;
+};
+
+template PhysicalMatParams GetMaterialParams(SolidPixelInputs IN, float3 v);
+
+template float3 GetRadiance(PhysicalShadingParams IN);
+
+template float3 GetIrradiance(PhysicalShadingParams IN);
+
+PhysicalShadingParams CalcShadingParams<PhysicalShadingParams>(SolidPixelInputs IN)
+{
+	PhysicalShadingParams OUT = (PhysicalShadingParams)0;
+
+	// view vector 
+	OUT.v = normalize(CAMERA_POS - IN.worldPos);
+
+	// material params
+	OUT.m = GetMaterialParams(IN, OUT.v);
+
+	// additional shading params
+	OUT.n_dot_v = max(EPS, dot(OUT.m.normal, OUT.v));
+	OUT.r2 = OUT.m.roughness * OUT.m.roughness; // remap roughness to make adjustments easier
+	OUT.worldPos = IN.worldPos;
+
+	return OUT;
+}
+
+float3 CalcLightContribution<PhysicalShadingParams>(float3 l, float3 lightIntensity, PhysicalShadingParams IN)
+{
+	// cosine factors
+	float3 h = normalize(l + IN.v); // half vector
+	float n_dot_l = max(EPS, dot(IN.m.normal, l));
+	float n_dot_h = max(0, dot(IN.m.normal, h));
+	float v_dot_h = max(0, dot(IN.v, h));
+
+	// diffuse component
+	float3 directDiffuse = (1 - F_schlick(IN.m.specular, n_dot_l)) * IN.m.albedo / PI; // fresnell multiplied for energy conservation
+
+	// specular component
+	float3 directSpec = F_schlick(IN.m.specular, v_dot_h) * D_ggx(IN.r2, n_dot_h) * G_schlick_backmann(IN.r2, n_dot_l, IN.n_dot_v) / (4.0 * n_dot_l * IN.n_dot_v);
+
+	return (directDiffuse + directSpec) * lightIntensity * n_dot_l;
+}
+
+#define GGX_MULTISCATTER 1
+
+float3 CalcAdditionalContributions<PhysicalShadingParams>(PhysicalShadingParams IN)
+{
+	// sample and decode split sum factors from lut
+	float2 ggxFactors = DecodeRG16(sample(brdf_lut, float2(IN.n_dot_v, IN.m.roughness)));
+	ggxFactors = ggxFactors * ggxFactors;
+	ggxFactors.x = 1 - ggxFactors.x;
+
+	// calc specular total energy
+	float3 specular = ggxFactors.x * IN.m.specular + ggxFactors.y;
+	float3 specularIrradiance = (float3)0.0;
+
+	// multiscattering approximation
+	// based on "A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting"
+	// https://www.jcgt.org/published/0008/01/03/paper.pdf
+#ifdef GGX_MULTISCATTER
+	float Ess = ggxFactors.x + ggxFactors.y;
+	float Ems = 1.0 - Ess;
+	float3 Favg = IN.m.specular + (1.0 - IN.m.specular) / 21.0;
+	float3 Fms = specular * Favg / (1.0 - Ems * Favg);
+	specularIrradiance = Fms * Ems;
+#endif
+	
+	// energy conservation for dielectrics (not-reflected light is diffused)
+	float3 diffuseConservation = 1.0 - specular - specularIrradiance; // equivalent of 1 - F used for direct light
+
+	// sample radiance/irradiance and add them to the total
+	float3 radiance = GetRadiance(IN);
+	float3 irradiance = GetIrradiance(IN);
+	float3 indirectSpec = radiance * specular + irradiance * specularIrradiance;
+	float3 indirectDiffuse = diffuseConservation * irradiance * IN.m.albedo / PI;
+
+	return indirectDiffuse + indirectSpec;
+}
+
+float3 GetNormal<PhysicalShadingParams>(PhysicalShadingParams IN)
+{
+	return IN.m.normal;
+}
+
+template effect Physical : LitSolid;

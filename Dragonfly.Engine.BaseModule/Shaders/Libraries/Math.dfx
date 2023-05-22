@@ -1,0 +1,87 @@
+﻿shader: Math;
+
+#define PI 3.14159265359
+#define PI_OVER_2 1.57079632679
+#define ONE_OVER_PI 0.31830988618
+#define TWO_PI 6.28318530718
+#define SQRT2 1.41421356237
+#define SQRT3 1.73205080757
+#define EPS 0.000000001
+#define FLMAX 3e38
+#define PHI 1.61803398874989
+
+// Returns 1.0 if the two vector are clockwise sorted, -1.0 otherwise
+float GetWinding(float2 a, float2 b)
+{
+    return 2.0 * step(a.x * b.y, a.y * b.x) - 1.0;
+}
+
+float dot2(float2 a)
+{
+    return dot(a, a);
+}
+
+float dot2(float3 a)
+{
+    return dot(a, a);
+}
+
+float dot2(float4 a)
+{
+    return dot(a, a);
+}
+
+float modulus(float a, float b)
+{
+    return a - b * floor(a / b);
+}
+
+float3 modulus(float3 a, float3 b)
+{
+    return a - b * floor(a / b);
+}
+
+// equivalent to the sign() function, but returns 1.0 instead of 0.0 for a zero value.
+float nzsign(float value)
+{
+    float s = sign(value);
+    return s + 1.0 - abs(s);
+}
+
+// returns the first value if non zero, or the second otherwise
+float nonzero(float value, float valueIfZero)
+{
+    if (value == 0.0)
+        value = valueIfZero;
+    return value;
+}
+
+// multiply a vector for a basis, where ech axis is provided as a vector
+float3 basemul(float4 v, float3 a0, float3 a1, float3 a2, float3 a3)
+{
+    return v.x * a0 + v.y * a1 + v.z * a2 + v.w * a3;
+}
+
+// fast approximation that returns a vector containing sine and cosine of the specified angle
+float2 sincos_fast(float radians)
+{
+    float2 x = float2(radians, radians + PI_OVER_2);
+    float2 x0 = PI - x + TWO_PI * floor(0.5 * ONE_OVER_PI * x);
+    return 4.0 * ONE_OVER_PI * ONE_OVER_PI * x0 * (PI - abs(x0));
+}
+
+float gamma(float x, float k)
+{
+	return k * x / (1.0f + k - x);
+}
+
+float gammaInv(float x, float k)
+{
+	return x * (1.0f + k) / (x + k);
+}
+
+float pow5(float x)
+{
+	float x2 = x * x;
+	return x2 * x2 * x;
+}

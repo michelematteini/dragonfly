@@ -1,0 +1,11 @@
+﻿shader: TexCoordScaling;
+
+float4 texCoordsScaleOffset; // scale and offset for the texture coords
+
+/// <summary>
+/// Apply a constant scaling and offset to the specified tex coords. 
+/// </summary>
+float2 TransformTexCoords(float2 texCoords)
+{
+	return texCoords * texCoordsScaleOffset.xy + texCoordsScaleOffset.zw; // apply coords scaling
+}

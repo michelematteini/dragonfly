@@ -1,0 +1,144 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{5440138A-E0B3-4B32-9713-38DEF2C4FF11}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Dragonfly.Utils</RootNamespace>
+    <AssemblyName>Dragonfly.Utils</AssemblyName>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <OutputPath>bin\x64\Release\</OutputPath>
+    <DefineConstants>
+    </DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x86'">
+    <OutputPath>bin\x86\Release\</OutputPath>
+    <DefineConstants>
+    </DefineConstants>
+    <Optimize>true</Optimize>
+    <DebugType>pdbonly</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Testing|x64'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x64\Testing\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x64</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Testing|x86'">
+    <DebugSymbols>true</DebugSymbols>
+    <OutputPath>bin\x86\Testing\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <DebugType>full</DebugType>
+    <PlatformTarget>x86</PlatformTarget>
+    <LangVersion>7.3</LangVersion>
+    <ErrorReport>prompt</ErrorReport>
+    <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AsyncFileLoader.cs" />
+    <Compile Include="AsyncRenderLoop.cs" />
+    <Compile Include="BitmapDataEx.cs" />
+    <Compile Include="BitmapEx.cs" />
+    <Compile Include="DataStructures\ArrayRange.cs" />
+    <Compile Include="DataStructures\BlockingQueue.cs" />
+    <Compile Include="DataStructures\CircularArray.cs" />
+    <Compile Include="ConsoleSelectionLoop.cs" />
+    <Compile Include="ConsoleUtils.cs" />
+    <Compile Include="DataStructures\LookupTable.cs" />
+    <Compile Include="DataStructures\ObservableRecord.cs" />
+    <Compile Include="HashCode.cs" />
+    <Compile Include="DataStructures\InvariantList.cs" />
+    <Compile Include="DataStructures\InvariantSet.cs" />
+    <Compile Include="DataStructures\ObservableDictionary.cs" />
+    <Compile Include="DataStructures\ObservableList.cs" />
+    <Compile Include="DataStructures\ObservableSet.cs" />
+    <Compile Include="DataStructures\IndexedList.cs" />
+    <Compile Include="ListEx.cs" />
+    <Compile Include="MutableString.cs" />
+    <Compile Include="MutableStringRange.cs" />
+    <Compile Include="ObjectPool.cs" />
+    <Compile Include="Pair.cs" />
+    <Compile Include="PathEx.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="DataStructures\SkipList.cs" />
+    <Compile Include="DataStructures\SortedLinkedList.cs" />
+    <Compile Include="DataStructures\SubList.cs" />
+    <Compile Include="RandomEx.cs" />
+    <Compile Include="Range.cs" />
+    <Compile Include="SlimParallel.cs" />
+    <Compile Include="SlottedMemoryManager.cs" />
+    <Compile Include="DataStructures\SortedQueue.cs" />
+    <Compile Include="SyncRenderLoop.cs" />
+    <Compile Include="DataStructures\QuadTree.cs" />
+    <Compile Include="RenderLoop.cs" />
+    <Compile Include="SerializationUtils.cs" />
+    <Compile Include="StringEx.cs" />
+    <Compile Include="VKey.cs" />
+    <Compile Include="WindowRenderLoop.cs" />
+    <Compile Include="XmlUtils.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dragonfly.Utils.Win32\Dragonfly.Utils.Win32.vcxproj">
+      <Project>{2607c251-5e11-43b8-923f-1e4d383573be}</Project>
+      <Name>Dragonfly.Utils.Win32</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+  <!--CSharp Exporter (Do not edit)-->
+  <!--End Group-->
+</Project>

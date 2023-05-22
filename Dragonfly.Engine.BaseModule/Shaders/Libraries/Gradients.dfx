@@ -1,0 +1,133 @@
+﻿shader: Gradients;
+using Math;
+
+// Utility library to manage gradients, intended as a float4 in which 'w' contains the value of a 3d function, and xyz its derivatives along the three dimensions.
+
+float4 ConstToGrad(float value)
+{
+    return float4(0, 0, 0, value);
+}
+
+float4 GradPow(float4 grad, float exponent)
+{
+    float4 result;
+    result.xyz = exponent * pow(grad.w, exponent - 1.0) * grad.xyz;
+    result.w = pow(grad.w, exponent);
+    return result;
+}
+
+float4 GradMul(float4 grad1, float4 grad2)
+{
+    float4 result;
+    result.w = grad1.w * grad2.w;
+    result.xyz = grad1.w * grad2.xyz + grad2.w * grad1.xyz;
+    return result;
+}
+
+float4 GradPow2(float4 grad)
+{
+    float4 result;
+    result.w = grad.w * grad.w;
+    result.xyz = 2.0 * grad.w * grad.xyz;
+    return result;
+}
+
+float4 GradDiv(float4 grad1, float4 grad2)
+{
+    float4 result;
+    float safeGrad2w = nonzero(grad2.w, 0.0000001);
+    result.w = grad1.w / safeGrad2w;
+    result.xyz = (grad1.xyz * grad2.w - grad1.w * grad2.xyz)  / (safeGrad2w * safeGrad2w);
+    return result;
+}
+
+// Apply a cubic smoothstep to the grad
+float4 GradCubic(float4 grad)
+{
+    float w = grad.w;
+    grad.w = w * w * (3.0 - 2.0 * w);
+    grad.xyz = 6.0 * w * (1.0 - w) * grad.xyz;
+    return grad;
+}
+
+// Apply a quintic smoothstep to the grad
+float4 GradQuintic(float4 grad)
+{
+    float w = grad.w;
+    float w2 = w * w;
+    grad.w = w2 * w * (6.0 * w2 - 15.0 * w + 10);
+    grad.xyz = 30 * w2 * (w2 - 2.0 * w + 1)  * grad.xyz;
+    return grad;
+}
+
+float4 GradClip(float4 grad, float percent)
+{
+    grad.w -= percent * 0.5;
+    grad /= 1.0 - percent;
+    grad.w = saturate(grad.w);
+    return grad;
+}
+
+float4 GradOffset(float4 grad, float offset)
+{
+    grad.w += offset;
+    return grad;
+}
+
+float4 GradMax(float4 grad, float min)
+{
+    if (grad.w < min)
+        grad = float4(0, 0, 0, min);
+    
+    return grad;   
+}
+
+// Given a grad value threshold, splits the specified grad in two parts, where the grad is less than, and one where it's greater or equal to the threshold. These noises sum up to the original grad. 
+void GradSplitAt(float4 grad, float thr, out float4 gradLessThanThr, out float4 gradGreaterEqualThanThr)
+{
+	if (grad.w < thr)
+	{
+		gradLessThanThr = grad;
+		gradGreaterEqualThanThr = float4(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+	else
+	{
+		gradLessThanThr = float4(0.0f, 0.0f, 0.0f, thr);
+		gradGreaterEqualThanThr = float4(grad.xyz, grad.w - thr);
+	}
+}
+
+/// <summary>
+/// Compute the normal direction from a grad record, provided the uv directions
+/// </summary>
+float3 GradToNormal(float4 grad, float3 uDir, float3 vDir)
+{
+    float3 n = cross(vDir, uDir) - uDir * dot(uDir, grad.xyz) - vDir * dot(vDir, grad.xyz);
+    return normalize(n);
+}
+
+
+/// <summary>
+/// Compute the normal direction from a grad record, provided the surface normal and another non-parallel direction
+/// </summary>
+float3 GradToNormalNT(float4 grad, float3 surfaceNormal, float3 otherDir)
+{
+    float3 vDir = normalize(cross(surfaceNormal, otherDir));
+    float3 uDir = cross(surfaceNormal, vDir);
+    float3 n = surfaceNormal - uDir * dot(uDir, grad.xyz) - vDir * dot(vDir, grad.xyz);
+    return normalize(n);
+}
+
+
+/// <summary>
+/// Compute the slope function from a grad record, provided the uv directions that will be considered flat.
+/// Derivatives are left empty.
+/// </summary>
+float4 GradSlope(float4 grad, float3 uDir, float3 vDir)
+{
+    float udot = dot(uDir, grad.xyz);
+    float vdot = dot(vDir, grad.xyz);
+    float upv2 = udot * udot + vdot * vdot;
+    float upv2p1 = 1.0 + upv2;
+    return float4(0, 0, 0, 1.0 - 1.0 / upv2p1);
+}

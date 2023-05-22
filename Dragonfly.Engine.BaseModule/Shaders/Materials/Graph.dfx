@@ -1,0 +1,113 @@
+﻿shader: Graph;
+using Core;
+using TemplScreenColor;
+using ColorConversion;
+using SDF;
+using AlphaBlend;
+
+#define MAX_DATA_POINTS 32
+
+float aspect;
+float4 data[32];
+float2 rangeMin;
+float2 rangeSize;
+int dataPointCount;
+float4 color1;
+float4 color2;
+float4 color3;
+float4 backgroundColor;
+float2 graphSizePixels;
+float3 tracesWidth;
+float2 paddingPercent;
+float3 traceAlpha;
+float3 fillAlpha;
+
+POS3_TEX_NORM GetVertexData(vertex_t IN)
+{
+	return IN;
+}
+
+float UVToDataX(float2 uv)
+{
+	float x = uv.x * rangeSize.x + rangeMin.x;
+	[loop] for (int i = 1; i < dataPointCount; i++)
+	{
+		float4 p0 = data[i - 1];
+		float4 p1 = data[i];
+		if (p1.x >= x)
+		{
+			float weight = saturate((x - p0.x) / (p1.x - p0.x));
+			return (float)(i - 1) + weight;
+		}
+	}
+
+	return (float)dataPointCount;
+}
+
+float4 SampleDataAt(float dataIndex)
+{
+	int i = floor(dataIndex);
+	return lerp(data[i], data[i + 1], frac(dataIndex));
+}
+
+void TraceGraph(float2 pixCoords, float dataIndex, float3 traceMask, float4 color, float thickness, inout float4 background)
+{
+	if (dot(traceAlpha, traceMask) > 0)
+	{
+		int i = floor(dataIndex);
+		int iStart = max(i - 1, 0);
+		int iEnd = min(i + 2, dataPointCount - 1);
+		float2 l0 = (float2(data[iStart].x, dot(traceMask, data[iStart].yzw)) - rangeMin) / rangeSize * graphSizePixels;
+		float2 sdf = SDF_Empty();
+		[loop] for (int li = iStart + 1; li <= iEnd; li++)
+		{
+			float2 l1 = (float2(data[li].x, dot(traceMask, data[li].yzw)) - rangeMin) / rangeSize * graphSizePixels;
+			float2 curSdf = SDF_LineSegment2D(l0, l1, pixCoords);
+			if (abs(curSdf.y) < abs(sdf.y))
+			{
+				sdf = curSdf;
+			}
+			l0 = l1;
+		}
+		TraceSDFWithAA(sdf, color, thickness, 1.0, background);
+	}
+}
+
+void FillGraph(float2 uvValue, float graphValue, float4 color, inout float4 background)
+{
+	float fillAmmount = color.a * step(uvValue.y, graphValue);
+	background.rgb += color.rgb * fillAmmount;
+	background.a =  1.0 - (1.0 - background.a) * (1.0 - fillAmmount);
+}
+
+float4 GetPixelColor(POS4_TEX_NORM IN)
+{
+	float4 OUT = (float4)0;
+
+	float2 uv = float2(IN.texCoords.x, 1.0 - IN.texCoords.y);
+	uv = (uv - 0.5 * paddingPercent) / (1.0 - paddingPercent);
+	
+	OUT = backgroundColor;
+
+	if (all(abs(uv - 0.5) <= 0.5))
+	{
+		float dataIndex = UVToDataX(uv);
+		float4 values = SampleDataAt(dataIndex);
+		float2 pixCoords = uv * graphSizePixels;
+		float2 uvValue = uv * rangeSize + rangeMin;
+		
+		// distribution 1
+		FillGraph(uvValue, values.y, color1 * float4(1, 1, 1, fillAlpha.x), inout OUT);
+		TraceGraph(pixCoords, dataIndex, float3(1.0, 0.0, 0.0), color1 * float4(1, 1, 1, traceAlpha.x), 0.5f * tracesWidth.x, inout OUT);
+		// distribution 2
+		FillGraph(uvValue, values.z, color2 * float4(1, 1, 1, fillAlpha.y), inout OUT);
+		TraceGraph(pixCoords, dataIndex, float3(0.0, 1.0, 0.0), color2 * float4(1, 1, 1, traceAlpha.y), 0.5f * tracesWidth.y, inout OUT);
+		// distribution 2
+		FillGraph(uvValue, values.w, color3 * float4(1, 1, 1, fillAlpha.z), inout OUT);
+		TraceGraph(pixCoords, dataIndex, float3(0.0, 0.0, 1.0), color3 * float4(1, 1, 1, traceAlpha.z), 0.5f * tracesWidth.z, inout OUT);
+	}
+
+	return OUT;
+}
+
+effect Graph : ScreenColor(POS3_TEX_NORM);

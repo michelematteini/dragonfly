@@ -1,0 +1,8 @@
+﻿shader: AlphaMasking;
+
+float alphaThr;
+
+void maskPixel(float alpha)
+{
+	clip(alpha - alphaThr);
+}

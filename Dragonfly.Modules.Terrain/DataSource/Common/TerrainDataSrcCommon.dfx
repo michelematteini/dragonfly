@@ -1,0 +1,55 @@
+﻿shader: TerrainDataSrcCommon;
+using TerrainCurvatureCommon;
+using Sampling;
+using TiledFloat3;
+
+// tile area param
+float3 normal;
+float3 basePosition;
+int3 baseTile;
+float2 tileSize;
+float3 xDir;
+float3 yDir;
+
+layout PS_OUT_TERRAIN_TEX
+{
+	color normal : COLOR0;
+	color albedo : COLOR1;
+};
+
+layout PS_OUT_TERRAIN_DISPL
+{
+	float displacement : COLOR0;
+};
+
+struct LocalDataSrcInfo
+{
+	TiledFloat3 noisePosition;
+	float3 surfaceNormal;
+};
+
+LocalDataSrcInfo GetLocalDataSrcInfo(float2 uv)
+{
+	LocalDataSrcInfo info = (LocalDataSrcInfo)0;
+	
+	// snap uv to current output target
+	float2 expandedUV = RemapUVTexelCenterTo01(uv, PIX_SIZE);
+	float2 snappedUV = QuantizeUV01InSteps(uv, round(1.0 / PIX_SIZE - 1.0)); // rounds to the vertex, prevent edges mismatch
+	
+	// interpolate local noise position
+	info.noisePosition.value = basePosition + tileSize.x * snappedUV.x * xDir + tileSize.y * snappedUV.y * yDir;
+	info.noisePosition.tile = baseTile;
+		
+#ifdef curvatureEnabled	
+	// add surface curvature offset
+	TerrainCurvatureInfo curvature = SampleCurvatureLUT(snappedUV);
+	info.noisePosition = TF3_Add(info.noisePosition, curvature.offset);
+	
+	// assign curved normal
+	info.surfaceNormal = curvature.normal;
+#else
+	info.surfaceNormal = normal;
+#endif	
+	
+	return info;
+}

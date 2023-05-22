@@ -1,0 +1,53 @@
+﻿shader: WorldCoords;
+
+using Math;
+using Core;
+
+// Transfrom a tiled world postion to another, where the tile size is increaset by @wtileSizeMul times
+float3 ExpandWorldCoords(float3 tiledWorldPos, int3 worldTile, int wtileSizeMul)
+{
+    return tiledWorldPos + WTILE_SIZE * modulus(worldTile, wtileSizeMul);
+}
+
+float3 ExpandWorldCoords(float3 tiledWorldPos, int3 worldTile)
+{
+    return tiledWorldPos + WTILE_SIZE * worldTile;
+}
+
+/// <summary>
+/// Returns the multiplier that will be applied to the world coordinates for a given octave.
+/// </summary>
+float OctaveToCoordMul(int octave)
+{
+    return exp2(octave);
+}
+
+/// <summary>
+// Calculate a set of coordinates, derived from the tiled world coords, that will tile a texture with the given texel size seamlessly on the world
+/// </summary>
+/// <param name="texelSize">Texel size of the texture to be tiled seamlessly, the texture should be squared and its size a power of 2.</param>
+/// <param name="octaveMul">The octave multiplier that will be applied to the coords (must be a power of 2, use OctaveToCoordMul())</param>
+float3 CalcWorldCoords(float3 tiledWorldPos, int3 worldTile, float texelSize, float octaveMul)
+{
+    float wtileExMul = max(1.0, round(1.0 / (WTILE_SIZE * texelSize * octaveMul)));
+    float3 tiledWorldPosEx = ExpandWorldCoords(tiledWorldPos, worldTile, wtileExMul);
+    return tiledWorldPosEx * octaveMul;
+}
+
+/// <summary>
+// Calculate a set of coordinates, derived from the tiled world coords, that will tile a texture with the given texel size seamlessly on the world
+/// </summary>
+/// <param name="texelSize">Texel size of the texture to be tiled seamlessly, the texture should be squared and its size a power of 2.</param>
+/// <param name="octave">The octave, that determine the frequency: e.g. octave 0 means one texel per meter, octave n means 2^n texels per meter</param>
+float3 CalcWorldCoords(float3 tiledWorldPos, int3 worldTile, float texelSize, int octave)
+{
+    return CalcWorldCoords(tiledWorldPos, worldTile, texelSize, OctaveToCoordMul(octave));
+}
+
+// Calculate a set of coordinate, derived from the local world coords, that will tile a texture with the given texel size seamlessly, and are guaranteed to repeat in the same way for each tile
+// which make it possible to use them even with just a local world position without its tile.
+float3 CalcTiledWorldCoords(float3 tiledWorldPos, float texelSize, int repsPerWorldTile)
+{
+    float fitWorldTileMul = 1.0 / (WTILE_SIZE * texelSize);
+    return tiledWorldPos * fitWorldTileMul * repsPerWorldTile;
+}

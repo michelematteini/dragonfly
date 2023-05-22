@@ -1,0 +1,230 @@
+﻿shader: EnvMaps;
+
+using Math;
+using ColorConversion;
+using Sampling;
+
+// ======== EQUIRECT ENVIRONMENT =============== //
+
+// convert a direction to the sampling coords for an equirectangular env map.
+float2 DirToEquirectCoords(float3 dir)
+{
+	float vertAngle = acos(dir.y);
+	float hAngle = atan2(dir.x, dir.z);
+	return float2(0.5 * (1.0 + hAngle * ONE_OVER_PI), vertAngle * ONE_OVER_PI);
+}
+
+// convert sampling coords of an equirect texture to the represented direction.
+float3 EquirectCoordsToDir(float2 uv)
+{
+	float hAngle = (2.0 * uv.x - 1.0) * PI;
+	float cosVAngle = cos(uv.y * PI);
+	float sinVAngle = 1.0 - cosVAngle * cosVAngle;
+	return float3(sinVAngle * sin(hAngle), cosVAngle, sinVAngle * cos(hAngle));
+}
+
+// ======== CUBE FACES TEXTURE MAPPINGS ======== //
+
+// view direction -> cubemap face direction
+float3 GetCubeFaceDir(float3 dir)
+{
+	float3 a = abs(dir);
+	float3 c = step(a.yzx, a);
+	float3 n = 1 - c;
+	return float3(c.x * n.z, c.y * n.x, c.x * c.z + n.x * n.y) * sign(dir);
+}
+
+// cubemap face direction -> face ID
+float CubeFaceDirToID(float3 faceDir)
+{
+	return dot(saturate(faceDir), float3(0, 1, 2)) + dot(saturate(-faceDir), float3(3, 4, 5));
+}
+
+// cubemap <face direction, view direction> -> face UVs
+float2 CubeFaceCoords(float3 faceDir, float3 viewDir)
+{
+	float3 uv3d = viewDir / dot(viewDir, faceDir);
+	float3 uDir = float3(faceDir.z + abs(faceDir.y), 0, -faceDir.x);
+	float3 vDir = float3(0, abs(faceDir.y) - 1, faceDir.y);
+	return float2(dot(uv3d, uDir), dot(uv3d, vDir)) * .5 + .5;
+}
+
+// cubemap <face dir, face UVs> -> view direction
+float3 CubeFaceCoodsToDir(float3 faceDir, float2 faceUV)
+{
+	float3 absDir = abs(faceDir);
+	float3 uOffset = float3(faceDir.z + absDir.y, 0, -faceDir.x);
+	float3 vOffset = float3(0, -absDir.x -absDir.z, faceDir.y);
+	float2 clipSpaceUV = 2 * faceUV - 1;
+	return normalize(faceDir + clipSpaceUV.x * uOffset + clipSpaceUV.y * vOffset);
+}
+
+// ======== CUBE2D ENVIROMENT ATLAS ============ //
+
+// CUBE2D UVs -> face UVs
+float2 Cube2DCoordsToFaceUVs(float2 uv)
+{
+	return frac(uv * float2(4, 2));
+}
+
+// CUBE2D UVs -> face direction
+float3 Cube2DCoordsToFaceDir(float2 uv)
+{
+	float2 id = floor(uv * float2(4, 2));
+	float ax = 1 - id.x;
+	float3 absNormal = saturate(float3(ax, 1 - abs(ax), -ax));
+	float normalSign = 2.0 * min(2.5 - id.x, 0.5 - id.y);
+	return absNormal * normalSign;
+}
+
+// face direction -> CUBE2D UVs offset
+float2 Cube2DFaceDirToCoordOffset(float3 faceDir)
+{
+	float3 dpos = max(0, faceDir);
+	float3 dneg = max(0, -faceDir);
+	return float2(0.25, 0.50) * float2(dpos.y + dneg.y + 2 * dpos.z + 3 * dneg.z, dneg.x + dneg.y);
+}
+
+// face direction, face UVs -> CUBE2D UVs
+float2 Cube2DFaceToCubeCoords(float3 faceDir, float2 faceUV)
+{
+	return float2(0.25, 0.50) * faceUV + Cube2DFaceDirToCoordOffset(faceDir);
+}
+
+// CUBE2D UVs -> view direction (the edge is continuously approximated, but not pixel accurate
+float3 Cube2DCoordsToViewDir(float2 uv, float2 texelSize)
+{
+	float3 faceDir = Cube2DCoordsToFaceDir(uv);
+	float2 faceUV = Cube2DCoordsToFaceUVs(uv);
+
+	// add a 1 pixel padding, which approximate the next face pixel
+	float2 faceTexelSize = float2(4, 2) * texelSize;
+	float2 unpaddedUV = (faceUV - faceTexelSize) / (1 - 2 * faceTexelSize);
+	
+	return CubeFaceCoodsToDir(faceDir, unpaddedUV);
+}
+
+// CUBE2D UVs -> view direction (the edge is exactly calculated to match faces with pixel-accuracy, but has discontinuities and is computationally  intensive)
+float3 Cube2DCoordsToEdgedViewDir(float2 uv, float2 texelSize)
+{
+	// expand and pad face UVs
+	float2 faceUV = Cube2DCoordsToFaceUVs(uv);
+	float2 expTexelSize = float2(8, 4) * texelSize;
+	float2 expUV = (2 * faceUV - 1) / (1 - expTexelSize);
+	faceUV = clamp((expUV + 1) * 0.5, 0.25 * expTexelSize, 1 - 0.25 * expTexelSize);
+
+	// compute edge direction
+	float4 ed;
+	ed.xy = step(1, max(0, expUV));
+	ed.zw = step(1, max(0, -expUV));
+	ed = ed * (1 - ed.yzwx); // select only one active direction
+
+	// compute edge cube coords
+	float3 faceDir = Cube2DCoordsToFaceDir(uv);
+	float3 np = max(0, faceDir);
+	float3 nn = max(0, -faceDir);
+	float2 t = 0.50 * texelSize / (1 - expTexelSize);
+	float2 lx = 0.25 * faceUV;
+	float2 ly = 0.50 * faceUV;
+	float2 duv = (float2)0;
+	duv = duv + np.x * float2(dot(ed, float4(0.75 + t.x,  0.50 - t.x,  0.75 - t.x,  0.50 -  t.x)), dot(ed, float4(0.00 + ly.y, 0.50 + ly.x, 0.00 + ly.y, 0.50 - ly.x)));
+	duv = duv + nn.x * float2(dot(ed, float4(0.50 + t.x,  0.25 + t.x,  1.00 - t.x,  0.25 +  t.x)), dot(ed, float4(0.00 + ly.y, 1.00 - ly.x, 0.00 + ly.y, 0.00 + ly.x)));
+	duv = duv + np.y * float2(dot(ed, float4(0.25 - lx.y, 0.50 + lx.x, 0.00 + lx.y, 1.00 - lx.x)), dot(ed, float4(0.00 + t.y,  0.00 + t.y,  0.50 + t.y,  0.00 + t.y)));
+	duv = duv + nn.y * float2(dot(ed, float4(0.00 + lx.y, 1.00 - lx.x, 0.25 - lx.y, 0.50 + lx.x)), dot(ed, float4(0.50 - t.y,  0.50 - t.y,  1.00 - t.y,  0.50 - t.y)));
+	duv = duv + np.z * float2(dot(ed, float4(0.00 + t.x,  0.25 + lx.x, 0.25 - t.x,  0.25 + lx.x)), dot(ed, float4(0.00 + ly.y, 0.50 + t.y,  0.50 + ly.y, 0.50 - t.y)));
+	duv = duv + nn.z * float2(dot(ed, float4(0.00 + t.x,  0.50 - lx.x, 0.25 - t.x,  0.50 - lx.x)), dot(ed, float4(0.50 + ly.y, 1.00 - t.y,  0.00 + ly.y, 0.00 + t.y)));
+	
+	// calc edged cube2d coords
+	float2 paddedUV = Cube2DFaceToCubeCoords(faceDir, faceUV); // encode compressed cube2d coords
+	float2 edgedUV = saturate(lerp(paddedUV, duv, dot(ed, 1))); // add edge to the compressed coords
+
+	// calc view direction
+	faceDir = Cube2DCoordsToFaceDir(edgedUV);
+	faceUV = Cube2DCoordsToFaceUVs(edgedUV);
+	return CubeFaceCoodsToDir(faceDir, faceUV);
+}
+
+// viewDir -> CUBE2D UVs
+float2 DirToCube2DCoords(float3 viewDir, float2 texelSize)
+{
+	float3 faceDir = GetCubeFaceDir(viewDir);
+	float2 faceUV = CubeFaceCoords(faceDir, viewDir);
+	
+	// exclude the 1 pixel padding on the cube2d face, which is only accessed for interpolation
+	float2 faceTexelSize = float2(4, 2) * texelSize;
+	faceUV = faceUV * (1 - 2 * faceTexelSize) + faceTexelSize;
+	
+	// encode cube2d coords
+	return Cube2DFaceToCubeCoords(faceDir, faceUV);
+}
+
+// viewDir, lod -> float4(CUBE2D UVs lod1, CUBE2D UVs lod2)
+float4 DirToCube2DCoordsLod2(float3 viewDir, float2 texelSize, float lod)
+{
+	float3 faceDir = GetCubeFaceDir(viewDir);
+	float4 faceUV = CubeFaceCoords(faceDir, viewDir).xyxy;
+
+	float4 scales = float4(0.25, 0.50, 1.00, 2.00);
+
+	// exclude the 1 pixel padding on the cube2d face, which is only accessed for interpolation
+	float baseLodScale = exp2(-floor(lod));
+	float4 faceTexelSize = (texelSize / (baseLodScale * scales.xy)).xyxy * scales.zzww;
+	faceUV = faceUV * (1 - 2 * faceTexelSize) + faceTexelSize;
+
+	// calc final cube coords
+	float4 cubeCoords = scales.xyxy * faceUV + Cube2DFaceDirToCoordOffset(faceDir).xyxy; // lod0 coords
+	cubeCoords = scales.zzyy * baseLodScale * (cubeCoords - 1) + 1; // move to correct lod
+	return cubeCoords;
+}
+
+// viewDir -> CUBE2D UVs at floor(lod)
+float2 DirToCube2DCoordsLod(float3 viewDir, float2 texelSize, float lod)
+{
+	float3 faceDir = GetCubeFaceDir(viewDir);
+	float2 faceUV = CubeFaceCoords(faceDir, viewDir);
+
+	// exclude the 1 pixel padding on the cube2d face, which is only accessed for interpolation
+	float baseLodScale = exp2(-floor(lod));
+	float2 faceTexelSize = float2(4, 2) * texelSize / baseLodScale;
+	faceUV = faceUV * (1 - 2 * faceTexelSize) + faceTexelSize;
+
+	// calc final cube coords
+	float2 cubeCoords = Cube2DFaceToCubeCoords(faceDir, faceUV); // lod0 coords
+	return baseLodScale * (cubeCoords - 1) + 1; // move to correct lod
+}
+
+// sample an HDR cube2d texture and return the unfiltered sample in the given direction of the lod 0
+// the result is returned as a linear space color.
+float3 sampleHDRCube2DPoint(texture hdrCubeTexture, float2 hdrCubeTexelSize, float3 viewDir)
+{
+	float2 sampleCoords = DirToCube2DCoords(viewDir, hdrCubeTexelSize);
+	return DecodeRGBE(sampleLevel0(hdrCubeTexture, sampleCoords));
+}
+
+// sample an HDR cube2d texture and return the bilinear interpolated sample in the given direction of the lod 0.
+// the result is returned as a linear space color.
+float3 sampleHDRCube2DLevel0(texture hdrCubeTexture, float2 hdrCubeTexelSize, float3 viewDir)
+{
+	float2 sampleCoords = DirToCube2DCoords(viewDir, hdrCubeTexelSize);
+	return SampleRGBEBicubic(hdrCubeTexture, sampleCoords, hdrCubeTexelSize);
+}
+
+// sample an HDR cube2d texture and return the trilinear interpolated sample in the given direction and for the give lod level
+// the result is returned as a linear space color.
+float3 sampleHDRCube2D(texture hdrCubeTexture, float2 hdrCubeTexelSize, float3 viewDir, float lod)
+{
+	float4 sampleCoords = DirToCube2DCoordsLod2(viewDir, hdrCubeTexelSize, lod);
+	float3 baseColor = SampleRGBEBicubic(hdrCubeTexture, sampleCoords.xy, hdrCubeTexelSize); // sample base lod
+	float3 lodColor = SampleRGBEBicubic(hdrCubeTexture, sampleCoords.zw, hdrCubeTexelSize); // sample next lod
+	return lerp(baseColor, lodColor, frac(lod)); // interpolate between lod
+}
+
+
+// sample an HDR cube2d texture and return the bilinear interpolated sample in the given direction of the specified lod
+// the result is returned as a linear space color.
+float3 sampleHDRCube2DLevel(texture hdrCubeTexture, float2 hdrCubeTexelSize, float3 viewDir, float lod)
+{
+	float2 sampleCoords = DirToCube2DCoordsLod(viewDir, hdrCubeTexelSize, lod);
+	return SampleRGBEBicubic(hdrCubeTexture, sampleCoords, hdrCubeTexelSize);
+}
+

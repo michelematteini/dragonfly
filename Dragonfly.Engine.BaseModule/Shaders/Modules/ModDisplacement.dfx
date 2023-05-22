@@ -1,0 +1,52 @@
+﻿shader: Displacement;
+using Sampling;
+
+texture displacementMap : NoFilter, AlwaysVisible; // grayscale vertex displacement, applied in VS
+float2 displacementScaleOffset; // if > 0, displacementMap is used to offset vertices in VS
+
+/// <summary>
+/// Returns the length of the displacement vector along the normal direction
+/// </summary>
+float GetDisplacementAmmount(float2 texCoords)
+{
+	float displ = displacementScaleOffset.y;
+
+	if (displacementScaleOffset.x)
+		displ += SampleBicubic(displacementMap, texCoords, texelSize(displacementMap)).r * displacementScaleOffset.x; // sample displacement map
+
+	return displ;
+}
+
+float GetDisplacementAmmountPoint(float2 texCoords)
+{
+	float displ = displacementScaleOffset.y;
+
+	if (displacementScaleOffset.x)
+		displ += sampleLevel0(displacementMap, texCoords).r * displacementScaleOffset.x; // sample displacement map
+
+	return displ;
+}
+
+float3 GetDisplacementVector(float3 normal, float displaceAmmount)
+{
+	return normal * displaceAmmount;
+}
+
+float3 DisplaceVertexOf(float3 position, float3 normal, float displaceAmmount)
+{
+	return position + GetDisplacementVector(normal, displaceAmmount);
+}
+
+/// <summary>
+/// Displace the given vertex position along the specified normal.
+/// </summary>
+/// <returns>The displaced vertex positon</returns>
+float3 DisplaceVertex(float3 position, float3 normal, float2 texCoords)
+{
+	return DisplaceVertexOf(position, normal, GetDisplacementAmmount(texCoords));
+}
+
+float2 GetDisplacementTexelSize()
+{
+	return texelSize(displacementMap);
+}

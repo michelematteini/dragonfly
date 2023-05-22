@@ -1,0 +1,332 @@
+﻿shader: Noise;
+using WorldCoords;
+using Sampling;
+using MatrixHelper;
+
+global texture randomLut : NoFilter;
+
+/// <summary>
+/// Offset of the ZW component of the noise, from the XY components: used to lower the samples required for 3d noise.
+/// </summary>
+float2 GetNoiseZWOffset(float z, float2 texelOffset)
+{
+    return z * float2(29, 37) + texelOffset;
+}
+
+float3 CalcNoiseWorldCoords(float3 tiledWorldPos, int3 worldTile, int octave)
+{
+    return CalcWorldCoords(tiledWorldPos, worldTile, texelSize(randomLut).x, OctaveToCoordMul(octave));
+}
+
+float3 CalcNoiseTiledWorldCoords(float3 tiledWorldPos, int repsPerWorldTile)
+{
+    return CalcTiledWorldCoords(tiledWorldPos, texelSize(randomLut).x, repsPerWorldTile);
+}
+
+/// <summary>
+/// Compute 4 channel of non-interpolated noise from a 2d position.  
+/// </summary>
+float4 Noise2x4Point(float2 position)
+{
+    float2 uv = position * texelSize(randomLut);
+    return sampleLevel0(randomLut, uv);
+}
+
+/// <summary>
+/// Compute 2 channel of non-interpolated noise from a 3d integer position.  
+/// </summary>
+float2 Noise3x2IntPoint(float3 p0, float2 texelOffset)
+{
+    float2 uv = (p0.xz + 0.5 + GetNoiseZWOffset(p0.y, texelOffset)) * texelSize(randomLut);
+    return sampleLevel0(randomLut, uv).xy;
+}
+
+/// <summary>
+/// Compute 2 channel of non-interpolated noise from a 3d position.  
+/// </summary>
+float2 Noise3x2Point(float3 position, float2 texelOffset)
+{
+    float3 p0 = floor(position + 0.5);
+    return Noise3x2IntPoint(p0, texelOffset);
+}
+
+/// <summary>
+/// Compute 2 channel of cubic-interpolated noise from a 3d position.  
+/// </summary>
+float2 Noise3x2Cubic(float3 position, float2 texelOffset)
+{
+    float3 p0 = floor(position);
+    float3 w = frac(position);
+    float2 uv0 = (p0.xz + 0.5 + GetNoiseZWOffset(p0.y, texelOffset)) * texelSize(randomLut);
+    float4x4 samples = Gather(randomLut, uv0, texelSize(randomLut));
+    w = w * w * (3.0 - 2.0 * w);
+    float4 noise = Bilinear(samples, w.xz);
+    return lerp(noise.xy, noise.zw, w.y);
+}
+
+/// <summary>
+/// Compute a channel of quintic-interpolated noise from a 3d position and its derivatives.  
+/// </summary>
+float4 NoiseQuinticDDX(float3 position, float2 texelOffset)
+{
+    // calc noise samples and weights
+    float3 p0 = floor(position);
+    float3 w = frac(position);
+    float2 uv0 = (p0.xz + 0.5 + GetNoiseZWOffset(p0.y, texelOffset)) * texelSize(randomLut);
+    float4x4 samples = Gather(randomLut, uv0, texelSize(randomLut));
+    float3 w2 = w * w;
+    float3 wcb = w2 * w * (10.0 - 15.0 * w + 6 * w2);
+
+    // interpolated samples along all 3 combinations of axes
+    float4 nx = lerp(float4(samples[0].xz, samples[2].xz), float4(samples[1].xz, samples[3].xz), wcb.x);
+    float2 nxz = lerp(nx.xy, nx.zw, wcb.z);
+    float2 nxy = lerp(nx.xz, nx.yw, wcb.y);
+    float4 ny = lerp(GetColumn(samples, 0), GetColumn(samples, 2), wcb.y);
+    float2 nyz = lerp(ny.xy, ny.zw, wcb.z);
+
+    float4 result;
+
+    // calc noise value
+    result.w = lerp(nxz.x, nxz.y, wcb.y);
+
+    // calc derivative values
+    float3 dwcb = 30.0 * w2 * (1.0 - 2.0 * w + w2);
+    float3 ddx = float3(nyz.y - nyz.x, nxz.y - nxz.x, nxy.y - nxy.x);
+    result.xyz = dwcb * ddx;
+
+    return result;
+}
+
+float4 NoiseOctaveDDX(float3 coords, float amplitude, float frequency, float2 texelOffset)
+{
+    float4 noise = NoiseQuinticDDX(coords * frequency, texelOffset) * amplitude;
+    noise.xyz = noise.xyz * frequency;
+    return noise;
+}
+
+/// <summary>
+/// Compute two channels of quintic-interpolated noise from a 3d position and its derivatives.  
+/// </summary>
+void NoiseQuinticDDX2(float3 position, float2 texelOffset, out float4 channel1, out float4 channel2)
+{
+    // calc noise samples and weights
+    float3 p0 = floor(position);
+    float3 w = frac(position);
+    float2 uv0 = (p0.xz + 0.5 + GetNoiseZWOffset(p0.y, texelOffset)) * texelSize(randomLut);
+    float4x4 samples = Gather(randomLut, uv0, texelSize(randomLut));
+    float3 w2 = w * w;
+    float3 wcb = w2 * w * (10.0 - 15.0 * w + 6 * w2);
+
+    // interpolated samples along all 3 combinations of axes
+    float4 nx1 = lerp(samples[0], samples[1], wcb.x);
+    float4 nx2 = lerp(samples[2], samples[3], wcb.x);
+    float4 nxz = lerp(nx1, nx2, wcb.z);
+    float4 nxy = lerp(float4(nx1.xy, nx2.xy), float4(nx1.zw, nx2.zw), wcb.y);
+    float4 ny1 = lerp(GetColumn(samples, 0), GetColumn(samples, 2), wcb.y);
+    float4 ny2 = lerp(GetColumn(samples, 1), GetColumn(samples, 3), wcb.y);
+    float4 nyz = lerp(float4(ny1.xy, ny2.xy), float4(ny1.zw, ny2.zw), wcb.z);
+
+    // calc noise value
+    float2 values = lerp(nxz.xy, nxz.zw, wcb.y);
+    channel1.w = values.x;
+    channel2.w = values.y;
+
+    // calc derivative values
+    float3 dwcb = 30.0 * w2 * (1.0 - 2.0 * w + w2);
+    channel1.xyz = dwcb * float3(nyz.y - nyz.x, nxz.z - nxz.x, nxy.z - nxy.x);
+    channel2.xyz = dwcb * float3(nyz.w - nyz.z, nxz.w - nxz.y, nxy.w - nxy.y);
+}
+
+
+void NoiseOctaveDDX2(float3 coords, float amplitude, float frequency, float2 texelOffset, out float4 ch1, out float4 ch2)
+{
+    NoiseQuinticDDX2(coords * frequency, texelOffset, out ch1, out ch2);
+    ch1 *= amplitude;
+    ch2 *= amplitude;
+    ch1.xyz *= frequency;
+    ch2.xyz *= frequency;
+}
+
+/// <summary>
+/// Compute 2 channel of linear-interpolated noise from a 3d position.  
+/// </summary>
+float2 Noise3x2Bilinear(float3 position, float2 texelOffset)
+{
+    float3 p0 = floor(position);
+    float3 w = frac(position);
+    float2 uv0 = (p0.xz + 0.5 + GetNoiseZWOffset(p0.y, texelOffset)) * texelSize(randomLut);
+    float4x4 samples = Gather(randomLut, uv0, texelSize(randomLut));
+    float4 noise = Bilinear(samples, w.xz);
+    return lerp(noise.xy, noise.zw, w.y);
+}
+
+/// <summary>
+/// Calc a noise that repeats itself as a multiple of the world tile size, to make it seamlessly tile with tiled world coords.
+/// </summary>
+/// <param name="tiledWorldPos">The tiled world position, that wraps with each world tile.</param>
+float2 WorldNoise3x2Bilinear(float3 tiledWorldPos, int3 worldTile, int octave, float2 texelOffset)
+{
+    float3 worldCoords = CalcNoiseWorldCoords(tiledWorldPos, worldTile, octave);
+    return Noise3x2Bilinear(worldCoords, texelOffset);
+}
+
+/// <summary>
+/// Calc a noise that repeats itself an integer multiple of the world tile size, to make it seamlessly tile with local world coords.
+/// </summary>
+/// <param name="tiledWorldPos">The tiled world position, that wraps with each world tile.</param>
+/// <param name="repsPerWorldTile">The number of times the noise repeats inside per world tile.</param>
+float2 TiledWorldNoise3x2Bilinear(float3 tiledWorldPos, int repsPerWorldTile, float2 texelOffset)
+{
+    float3 tiledWorldCoords = CalcNoiseTiledWorldCoords(tiledWorldPos, repsPerWorldTile);
+    return Noise3x2Bilinear(tiledWorldCoords, texelOffset);
+}
+
+/// <summary>
+/// Calc a noise that repeats itself as a multiple of the world tile size, to make it seamlessly tile with tiled world coords.
+/// </summary>
+/// <param name="tiledWorldPos">The tiled world position, that wraps with each world tile.</param>
+float2 WorldNoise3x2Point(float3 tiledWorldPos, int3 worldTile, int octave, float2 texelOffset)
+{
+    float3 worldCoords = CalcNoiseWorldCoords(tiledWorldPos, worldTile, octave);
+    return Noise3x2Point(worldCoords, texelOffset);
+}
+
+/// <summary>
+/// Calc a noise that repeats itself an integer multiple of the world tile size, to make it seamlessly tile with local world coords.
+/// </summary>
+/// <param name="tiledWorldPos">The tiled world position, that wraps with each world tile.</param>
+/// <param name="repsPerWorldTile">The number of times the noise repeats inside per world tile.</param>
+float2 TiledWorldNoise3x2Point(float3 tiledWorldPos, int repsPerWorldTile, float2 texelOffset)
+{
+    float3 tiledWorldCoords = CalcNoiseTiledWorldCoords(tiledWorldPos, repsPerWorldTile);
+    return Noise3x2Point(tiledWorldCoords, texelOffset);
+}
+
+// === NOISE DISTRIBUTION === //
+
+float GetDistrAmplitude(float4 distr)
+{
+    return distr[0];
+}
+
+float GetDistrAmplMul(float4 distr)
+{
+    return distr[1];
+}
+
+int GetDistrStartOctave(float4 distr)
+{
+    return (int)distr[2];
+}
+
+int GetDistrEndOctave(float4 distr)
+{
+    return (int)distr[3];
+}
+
+float2 NoiseDistribution(float3 position, float4 distr, float2 texelOffset)
+{
+    float amplitude = GetDistrAmplitude(distr);
+    int endOctave = GetDistrEndOctave(distr);
+
+    // accumulate octaves
+    float2 result = (float2)0;
+    [loop] for (int i = GetDistrStartOctave(distr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float3 coords = position * freq;
+        float2 noise = Noise3x2Cubic(coords, texelOffset + i) * amplitude;
+        result += noise;
+        amplitude *= GetDistrAmplMul(distr);
+    }
+
+    return result;
+}
+
+float4 NoiseDistributionDDX(float3 position, float4 distr, float2 texelOffset)
+{
+    float amplitude = GetDistrAmplitude(distr);
+    int endOctave = GetDistrEndOctave(distr);
+
+    // accumulate octaves
+    float4 result = (float4)0;
+    [loop] for (int i = GetDistrStartOctave(distr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float4 noise = NoiseOctaveDDX(position, amplitude, freq, texelOffset + i);
+        result += noise;
+        amplitude *= GetDistrAmplMul(distr);
+    }
+
+    return result;
+}
+
+void NoiseDistributionDDX2(float3 position, float4 distr, float2 texelOffset, out float4 ch1, out float4 ch2)
+{
+    float amplitude = GetDistrAmplitude(distr);
+    int endOctave = GetDistrEndOctave(distr);
+
+    // accumulate octaves
+    ch1 = (float4)0;
+    ch2 = (float4)0;
+    [loop] for (int i = GetDistrStartOctave(distr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float4 curCh1 = (float4)0;
+        float4 curCh2 = (float4)0;
+        NoiseOctaveDDX2(position, amplitude, freq, texelOffset + i, out curCh1, out curCh2);
+        ch1 += curCh1;
+        ch2 += curCh2;
+        amplitude *= GetDistrAmplMul(distr);
+    }
+}
+
+float4 NoiseWorldDistributionDDX(float3 worldPos, int3 worldTile, float4 distr, float2 texelOffset)
+{
+    float amplitude = GetDistrAmplitude(distr);
+    int endOctave = GetDistrEndOctave(distr);
+
+    // accumulate octaves
+    float4 result = (float4)0;
+    [loop] for (int i = GetDistrStartOctave(distr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float3 worldCoords = CalcWorldCoords(worldPos, worldTile, texelSize(randomLut).x, freq);
+        float4 noise = NoiseQuinticDDX(worldCoords, texelOffset + i) * amplitude;
+        noise.xyz = noise.xyz * freq;
+        result += noise;
+        amplitude *= GetDistrAmplMul(distr);
+    }
+
+    return result;
+}
+
+void NoiseWorldDistributionDDX2(float3 worldPos, int3 worldTile, float4 distr, float2 texelOffset, out float4 ch1, out float4 ch2)
+{
+    float amplitude = GetDistrAmplitude(distr);
+    int endOctave = GetDistrEndOctave(distr);
+
+    // accumulate octaves
+    ch1 = (float4)0;
+    ch2 = (float4)0;
+    [loop] for (int i = GetDistrStartOctave(distr); i <= endOctave; i++)
+    {
+        float freq = OctaveToCoordMul(i);
+        float3 worldCoords = CalcWorldCoords(worldPos, worldTile, texelSize(randomLut).x, freq);
+        float4 curCh1 = (float4)0;
+        float4 curCh2 = (float4)0;
+        NoiseQuinticDDX2(worldCoords, texelOffset + i, out curCh1, out curCh2);
+        curCh1 *= amplitude;
+        curCh2 *= amplitude;
+        curCh1.xyz = curCh1.xyz * freq;
+        curCh2.xyz = curCh2.xyz * freq;
+        ch1 += curCh1;
+        ch2 += curCh2;
+        amplitude *= GetDistrAmplMul(distr);
+    }
+}
+
+float NoiseDistrMax(float4 distr)
+{
+    return GetDistrAmplitude(distr) * (1.0 - pow(GetDistrAmplMul(distr), GetDistrEndOctave(distr) - GetDistrStartOctave(distr) + 1)) / (1.0 - GetDistrAmplMul(distr));
+}

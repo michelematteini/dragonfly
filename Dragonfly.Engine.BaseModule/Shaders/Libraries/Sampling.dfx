@@ -1,0 +1,195 @@
+﻿shader: Sampling;
+using ColorConversion;
+using Math;
+
+// calc the coordinates of the top-left texel and the bilinear interpolation weights
+void CalcBilinearCoords(float2 textureCoords, float2 texelSize, out float2 topLeftCoords, out float2 weights)
+{
+    topLeftCoords = textureCoords / texelSize - 0.5;
+    weights = frac(topLeftCoords);
+    topLeftCoords = (0.5 + floor(topLeftCoords)) * texelSize;
+}
+
+// calc the coordinates of the top-left texel and the bilinear interpolation weights given coordinate, scale and offset
+void CalcScaledBilinearCoords(float2 textureCoords, float2 coordsScale, float2 coordsOffset, float2 texelSize, out float2 topLeftCoords, out float2 weights)
+{
+    float2 res = 1.0 / texelSize;
+    float2 texelOffset = coordsOffset * res - 0.5;
+    weights = frac(texelOffset) + textureCoords * coordsScale * res;
+    texelOffset = floor(texelOffset) + floor(weights);
+    weights = frac(weights);
+    topLeftCoords = (0.5 + texelOffset) * texelSize;
+}
+
+
+// calc the coordinates of the top-left texel and the bicubic interpolation weights
+void CalcBicubicCoords(float2 textureCoords, float2 texelSize, out float2 topLeftCoords, out float2 weights)
+{
+    CalcBilinearCoords(textureCoords, texelSize, out topLeftCoords, out weights);
+    weights = weights * weights * (3 - 2 * weights);
+}
+
+// sample and returns 4 adjacent texels
+float4x4 Gather(texture t, float2 topLeftCoords, float2 texelSize)
+{
+    float4x4 samples;
+    float4 coords = topLeftCoords.xyxy;
+    coords.zw += texelSize;
+    samples[0] = sampleLevel0(t, coords.xy);
+    samples[1] = sampleLevel0(t, coords.zy);
+    samples[2] = sampleLevel0(t, coords.xw);
+    samples[3] = sampleLevel0(t, coords.zw);
+    return samples;
+}
+
+float4x4 GatherBilinear(texture t, float2 texCoords, float2 texelSize, out float2 weights)
+{
+    float2 topLeftCoords;
+    CalcBilinearCoords(texCoords, texelSize, out topLeftCoords, out weights);
+    return Gather(t, topLeftCoords, texelSize);
+}
+
+float4x4 GatherBicubic(texture t, float2 texCoords, float2 texelSize, out float2 weights)
+{
+    float2 topLeftCoords;
+    CalcBicubicCoords(texCoords, texelSize, out topLeftCoords, out weights);
+    return Gather(t, topLeftCoords, texelSize);
+}
+
+// returns the bilinear interpolation of the specified samples, given their weight
+float4 Bilinear(float4x4 samples, float2 weights)
+{
+    float4 topColor = lerp(samples[0], samples[1], weights.x);
+    float4 bottomColor = lerp(samples[2], samples[3], weights.x);
+    return lerp(topColor, bottomColor, weights.y);
+}
+
+float Bilinear(float4 samples, float2 weights)
+{
+    float2 topBottom = lerp(samples.xz, samples.yw, weights.x);
+    return lerp(topBottom.x, topBottom.y, weights.y);
+}
+
+/// <summary>
+/// Perform a bicubic interpolated sampling of the specified RGBE texture. 
+/// </summary>
+float3 SampleRGBEBicubic(texture hdrTexture, float2 textureCoords, float2 texelSize)
+{ 
+    float2 topLeftCoords;
+    float2 weights;
+    CalcBicubicCoords(textureCoords, texelSize, out topLeftCoords, out weights);
+    float4x4 samples = Gather(hdrTexture, topLeftCoords, texelSize);
+    DecodeRGBESamples(samples);
+    return Bilinear(samples, weights).rgb;
+}
+
+/// <summary>
+/// Perform a bicubic interpolated sampling of the specified sRGB texture. 
+/// </summary>
+float3 SampleSRGBBicubic(texture tex, float2 textureCoords, float2 texelSize)
+{
+#ifdef Directx9
+    // linear sampling for dx9, bicubic can cause artifact probably due to a compiler bug...
+    return DecodeSRGB(sample(tex, textureCoords).rgb);
+#else
+
+    float2 topLeftCoords;
+    float2 weights;
+    CalcBicubicCoords(textureCoords, texelSize, out topLeftCoords, out weights);
+    float4x4 samples = Gather(tex, topLeftCoords, texelSize);
+    DecodeSRGBSamples(samples);
+    return Bilinear(samples, weights).rgb;
+
+#endif
+}
+
+/// <summary>
+/// Perform a bicubic interpolated sampling of the specified texture. 
+/// </summary>
+float4 SampleBicubic(texture tex, float2 textureCoords, float2 texelSize)
+{
+    float2 topLeftCoords;
+    float2 weights;
+    CalcBicubicCoords(textureCoords, texelSize, out topLeftCoords, out weights);
+    float4x4 samples = Gather(tex, topLeftCoords, texelSize);
+    return Bilinear(samples, weights);
+}
+
+/// <summary>
+/// Perform a bilinear interpolated sampling of the specified texture. 
+/// </summary>
+float4 SampleBilinear(texture tex, float2 textureCoords, float2 texelSize)
+{
+    float2 topLeftCoords;
+    float2 weights;
+    CalcBilinearCoords(textureCoords, texelSize, out topLeftCoords, out weights);
+    float4x4 samples = Gather(tex, topLeftCoords, texelSize);
+    return Bilinear(samples, weights);
+}
+
+/// <summary>
+/// Perform a bilinear interpolated sampling of the specified texture, returning also the direction derivatives of the samples.
+/// </summary>
+float4 SampleBilinearDDX(texture tex, float2 textureCoords, float2 texelSize, out float4 sddx, out float4 sddy)
+{
+    float2 topLeftCoords;
+    float2 weights;
+    CalcBilinearCoords(textureCoords, texelSize, out topLeftCoords, out weights);
+    float4x4 samples = Gather(tex, topLeftCoords, texelSize);
+
+    sddx = lerp(samples[1] - samples[0], samples[3] - samples[2], weights.y);
+    sddy = lerp(samples[2] - samples[0], samples[3] - samples[1], weights.x);
+    
+    return Bilinear(samples, weights);
+}
+
+/// <summary>
+/// Given UVs ranging from 0 to 1, these are remapped so that they range from the center of the first texel to the last.
+/// </summary>
+float2 RemapUV01ToTexelCenter(float2 uv, float2 texelSize)
+{
+    return uv * (1.0 - texelSize) + 0.5 * texelSize;
+}
+
+/// <summary>
+/// Given UVs ranging from the center of the first texel to the last, these are remapped to range from 0 to 1.
+/// </summary>
+float2 RemapUVTexelCenterTo01(float2 uv, float2 texelSize)
+{
+    return saturate((uv - 0.5 * texelSize) / (1.0 - texelSize));
+}
+
+/// <summary>
+/// Given UVs ranging from the center of the first texel to the last, these are rounded to the closest texel center and then remapped to range from 0 to 1.
+/// </summary>
+float2 RoundUVTexelCenterTo01(float2 uv, float2 texelSize)
+{
+    return saturate(texelSize * round(uv / texelSize - 0.5) / (1.0 - texelSize));
+}
+
+/// <summary>
+/// Given UVs ranging from 0 to 1, these are quantized in each direction to the specified number of steps. 
+/// E.g. using 2 as step count would only output 0.0, 0.5 or 1.0.
+/// </summary>
+float2 QuantizeUV01InSteps(float2 uv, float2 stepCount)
+{
+    return floor(uv * stepCount + 0.5) / stepCount;
+}
+
+// Returns the coordinates of a poisson disk sample, with most of the samples taken near the center
+float2 PoissonDiskSQ(int index, int sampleCount, float maxRadius, float rotationRadians)
+{
+    float d = (float)index * maxRadius / max(1.0, (float)(sampleCount - 1));
+    float angle = index * PHI * TWO_PI + rotationRadians;
+    float2 sampleDir = sincos_fast(angle);
+    return d * sampleDir;
+}
+
+// Returns the coordinates of a uniformly sampled poisson disk
+float2 PoissonDiskUniform(int index, int sampleCount, float maxRadius, float rotationRadians)
+{
+    float d = (float)index * maxRadius / max(1.0, (float)(sampleCount - 1));
+    float angle = index * PHI * TWO_PI + rotationRadians;
+    float2 sampleDir = sincos_fast(angle);
+    return sqrt(d * maxRadius) * sampleDir;
+}

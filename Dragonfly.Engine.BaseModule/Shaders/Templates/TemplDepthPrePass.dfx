@@ -1,0 +1,45 @@
+﻿shader: TemplDepthPrePass;
+using Core;
+using Layouts;
+using Depth;
+using SolidCommon;
+
+template POS3_TEX_NORM GetVertexData(vertex_t IN);
+
+template void PostWorldSpaceProcessing(inout SolidVertexIntermediates data);
+
+VS POS4_TEX_SCREEN4 DepthPrePass(vertex_t IN)
+{
+	POS3_TEX_NORM vertex = GetVertexData(IN);
+	SolidVertexIntermediates data;
+	data.worldPos = float4(vertex.position, 1.0);
+	data.worldPos = mul(data.worldPos, INSTANCE_MATRIX);
+	data.worldPos = mul(data.worldPos, WORLD_MATRIX);
+	data.texCoords = vertex.texCoords;
+	data.worldNormal = mul(vertex.normal, (float3x3)INSTANCE_MATRIX);
+	data.worldNormal = mul(data.worldNormal, NRM_WORLD_MATRIX);
+	data.screenPos = data.worldPos;
+
+	PostWorldSpaceProcessing(inout data);
+
+	data.screenPos = mul(data.worldPos, CAMERA_MATRIX);
+
+	POS4_TEX_SCREEN4 OUT;
+	OUT.position = data.screenPos;
+	OUT.texCoords = data.texCoords;
+	OUT.screenPos = data.screenPos;
+	return OUT;
+}
+
+template float GetPixelDepth(float4 screenPos, float2 texCoords);
+
+PS RT_HALF DepthPrePass(POS4_TEX_SCREEN4 IN)
+{
+	RT_HALF OUT;
+	float depth = GetPixelDepth(IN.screenPos, IN.texCoords);
+	OUT.color = float4(EncodeDepth16(depth), 0, 0, 0);
+	return OUT;
+}
+
+// Template for a 16bit depth pass
+instanced template effect DepthPrePass{ VS = DepthPrePass, PS = DepthPrePass };
