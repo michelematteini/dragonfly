@@ -6,7 +6,7 @@ A compact DirectX component-based rendering framework for Windows.
 ![immagine](https://github.com/michelematteini/Dragonfly/assets/29386405/e2c08248-505b-4c07-91b8-bd184e2aa01c)
 ![immagine](https://github.com/michelematteini/Dragonfly/assets/29386405/3ba5159d-ed5d-4fb2-9363-8e039dd90bea)
 ![immagine](https://github.com/michelematteini/Dragonfly/assets/29386405/e53d1acc-b83e-40c1-9d25-13deff1a1be8)
-![immagine](https://github.com/michelematteini/Dragonfly/assets/29386405/e7ef4c50-1f8a-4354-8972-515d9bb6a9dd)
+![immagine](https://github.com/michelematteini/Dragonfly/assets/29386405/3eb05945-2233-4bb6-ae1d-8ea5780ac6dc)
 ![immagine](https://github.com/michelematteini/Dragonfly/assets/29386405/38327d43-162f-4705-9636-a23d9c626b41)
 ![immagine](https://github.com/michelematteini/Dragonfly/assets/29386405/8a17ca21-d1a6-44af-9506-00249c006466)
 ![immagine](https://github.com/michelematteini/Dragonfly/assets/29386405/898fd88e-8861-492e-ad8c-e6e424dcbf6d)
